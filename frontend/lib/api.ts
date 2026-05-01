@@ -60,9 +60,9 @@ export async function getPlayerMatches(playerKey: string) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function getLeaderboard(sport: string = "overall") {
+export async function getLeaderboard(sport: string = "overall", limit = 10000) {
   const res = await fetch(
-    `${API}/players/leaderboard?sport=${encodeURIComponent(sport)}`,
+    `${API}/players/leaderboard?sport=${encodeURIComponent(sport)}&limit=${limit}`,
   );
 
   const data = await res.json().catch(() => []);

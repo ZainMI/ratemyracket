@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PlayerSearch from "@/components/PlayerSearch";
 import PredictionResult from "@/components/PredictionResult";
-import PlayerRatingsCard from "@/components/PlayerRatingsCard";
+import CompactRatings from "@/components/CompactRatings";
 import { predictMatch, getPlayerRatings } from "@/lib/api";
 import type { Player, Prediction } from "@/lib/types";
 
@@ -13,6 +13,7 @@ export default function PredictPage() {
 
   const [p1Ratings, setP1Ratings] = useState<any>(null);
   const [p2Ratings, setP2Ratings] = useState<any>(null);
+  const [showRatings, setShowRatings] = useState(false);
 
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
@@ -21,15 +22,13 @@ export default function PredictPage() {
   async function selectP1(player: Player) {
     setP1(player);
     setPrediction(null);
-    const ratings = await getPlayerRatings(player.player_key);
-    setP1Ratings(ratings);
+    setP1Ratings(await getPlayerRatings(player.player_key));
   }
 
   async function selectP2(player: Player) {
     setP2(player);
     setPrediction(null);
-    const ratings = await getPlayerRatings(player.player_key);
-    setP2Ratings(ratings);
+    setP2Ratings(await getPlayerRatings(player.player_key));
   }
 
   useEffect(() => {
@@ -61,29 +60,42 @@ export default function PredictPage() {
   }, [p1, p2]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <header>
-        <h1 className="text-4xl font-bold text-gray-950">Predict a Match</h1>
-        <p className="mt-2 text-gray-600">
-          Search two players. The prediction updates automatically.
+        <h1 className="page-title">Predict a Match</h1>
+        <p className="page-subtitle">
+          Search two players and get an automatic Racketlon score prediction.
         </p>
       </header>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <PlayerSearch label="Player 1" onSelect={selectP1} />
         <PlayerSearch label="Player 2" onSelect={selectP2} />
       </div>
 
       {(p1Ratings || p2Ratings) && (
-        <div className="grid gap-5">
-          {p1Ratings && (
-            <PlayerRatingsCard title="Player 1 ratings" ratings={p1Ratings} />
-          )}
+        <section className="glass-card rounded-3xl p-4">
+          <button
+            onClick={() => setShowRatings((v) => !v)}
+            className="flex w-full items-center justify-between font-bold text-gray-950"
+          >
+            <span>Player Ratings</span>
+            <span className="text-emerald-600">
+              {showRatings ? "Hide" : "Show"}
+            </span>
+          </button>
 
-          {p2Ratings && (
-            <PlayerRatingsCard title="Player 2 ratings" ratings={p2Ratings} />
+          {showRatings && (
+            <div className="mt-4 grid gap-4 animate-fade-in">
+              {p1Ratings && (
+                <CompactRatings title="Player 1" ratings={p1Ratings} />
+              )}
+              {p2Ratings && (
+                <CompactRatings title="Player 2" ratings={p2Ratings} />
+              )}
+            </div>
           )}
-        </div>
+        </section>
       )}
 
       {p1 && p2 && p1.player_key === p2.player_key && (
@@ -93,7 +105,7 @@ export default function PredictPage() {
       )}
 
       {loadingPrediction && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <section className="glass-card rounded-3xl p-6">
           <p className="font-semibold text-gray-950">
             Generating prediction...
           </p>

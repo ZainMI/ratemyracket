@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { getPlayerRatings, getPlayerMatches } from "@/lib/api";
-import PlayerRatingsCard from "@/components/PlayerRatingsCard";
+import CompactRatings from "@/components/CompactRatings";
 import MatchHistory from "@/components/MatchHistory";
 
 export default function PlayerPage({
@@ -29,9 +29,7 @@ export default function PlayerPage({
 
   return (
     <div className="space-y-8">
-      {ratings && (
-        <PlayerRatingsCard title="Player Ratings" ratings={ratings} />
-      )}
+      {ratings && <CompactRatings title="Player Ratings" ratings={ratings} />}
       <MatchHistory matches={matches} />
     </div>
   );

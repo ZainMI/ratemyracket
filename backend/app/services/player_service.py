@@ -14,7 +14,9 @@ DISPLAY_RATING_MIN = 100
 DISPLAY_RATING_MAX = 2400
 MIN_GAMES_FOR_RATING_SCALE = 3
 
+_state_cache = None
 _rating_scale_cache = None
+_leaderboard_cache = {}
 
 
 # -----------------------------
@@ -63,8 +65,13 @@ def make_player_key(name: str, country: str) -> str:
 # Inference state
 # -----------------------------
 def load_inference_state():
-    with open(INFERENCE_STATE_PATH, "rb") as f:
-        return pickle.load(f)
+    global _state_cache
+
+    if _state_cache is None:
+        with open(INFERENCE_STATE_PATH, "rb") as f:
+            _state_cache = pickle.load(f)
+
+    return _state_cache
 
 
 def get_players_dict(state: dict):
@@ -445,36 +452,39 @@ def get_player_matches(player_key: str, limit: int = 50):
 
 
 def get_leaderboard(sport: str = "overall", limit: int = 100):
+    sport_key = sport.upper() if sport.lower() != "overall" else "OVERALL"
+
+    if sport_key in _leaderboard_cache:
+        return _leaderboard_cache[sport_key][:limit]
+
     state = load_inference_state()
     players = get_players_dict(state)
-
-    sport = sport.upper()
 
     rows = []
 
     for player_key, record in players.items():
         info = get_display_info(state, player_key, record)
 
-        if sport in SPORTS:
-            raw = float(record.get(f"{sport}_rating_p1", 0.0))
-            games = int(float(record.get(f"{sport}_games_p1", 0)))
+        if sport_key in SPORTS:
+            raw = float(record.get(f"{sport_key}_rating_p1", 0.0))
+            games = int(float(record.get(f"{sport_key}_games_p1", 0)))
 
             if games < MIN_GAMES_FOR_RATING_SCALE:
                 continue
 
-            rating = display_rating(raw, sport, players)
+            rating = display_rating(raw, sport_key, players)
 
         else:
             sport_ratings = []
             total_games = 0
 
             for s in SPORTS:
-                games = int(float(record.get(f"{s}_games_p1", 0)))
-                raw = float(record.get(f"{s}_rating_p1", 0.0))
+                games_s = int(float(record.get(f"{s}_games_p1", 0)))
+                raw_s = float(record.get(f"{s}_rating_p1", 0.0))
 
-                if games >= MIN_GAMES_FOR_RATING_SCALE:
-                    sport_ratings.append(display_rating(raw, s, players))
-                    total_games += games
+                if games_s >= MIN_GAMES_FOR_RATING_SCALE:
+                    sport_ratings.append(display_rating(raw_s, s, players))
+                    total_games += games_s
 
             if not sport_ratings:
                 continue
@@ -495,7 +505,17 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
 
     rows.sort(key=lambda x: x["rating"], reverse=True)
 
-    for i, row in enumerate(rows[:limit], start=1):
+    for i, row in enumerate(rows, start=1):
         row["rank"] = i
 
+    _leaderboard_cache[sport_key] = rows
+
     return rows[:limit]
+
+
+def clear_player_service_cache():
+    global _state_cache, _rating_scale_cache, _leaderboard_cache
+
+    _state_cache = None
+    _rating_scale_cache = None
+    _leaderboard_cache = {}

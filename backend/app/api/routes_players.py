@@ -17,7 +17,7 @@ def search(q: str, limit: int = 20):
 
 
 @router.get("/leaderboard")
-def leaderboard(sport: str = "overall", limit: int = 100):
+def leaderboard(sport: str = "overall", limit: int = 10000):
     return get_leaderboard(sport=sport, limit=limit)
 
 

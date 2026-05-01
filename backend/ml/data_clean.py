@@ -4,7 +4,6 @@ import re
 INVALID_DRAWS = ["double", "doubles", "mixed", "league", "team"]
 
 
-# clean
 def clean_matches(
     input_csv="data/matches.csv",
     output_csv="data/matches_cleaned.csv",

@@ -1,0 +1,35 @@
+{
+  "status": "ok",
+  "mode": "full_backfill",
+  "start_date": "2000-01-01",
+  "end_date": "2026-05-07",
+  "tournaments_found": 270,
+  "raw_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_raw.csv",
+  "recent_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_recent.csv",
+  "cleaned_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_cleaned.csv",
+  "feature_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
+  "inference_state": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
+  "predictor_dir": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/models/catboost/artifacts/predictor_package",
+  "retrained": true,
+  "metadata": {
+    "mode": "train_full",
+    "data_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
+    "inference_state_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
+    "n_rows": 28750,
+    "sport_metrics": {
+      "TT": {
+        "n_fit_rows": 28750
+      },
+      "BD": {
+        "n_fit_rows": 28750
+      },
+      "SQ": {
+        "n_fit_rows": 28750
+      },
+      "TN": {
+        "n_fit_rows": 19658
+      }
+    },
+    "match_metrics": null
+  }
+}

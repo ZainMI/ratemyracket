@@ -1,0 +1,21 @@
+{
+  "mode": "train_full",
+  "data_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
+  "inference_state_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
+  "n_rows": 28750,
+  "sport_metrics": {
+    "TT": {
+      "n_fit_rows": 28750
+    },
+    "BD": {
+      "n_fit_rows": 28750
+    },
+    "SQ": {
+      "n_fit_rows": 28750
+    },
+    "TN": {
+      "n_fit_rows": 19658
+    }
+  },
+  "match_metrics": null
+}

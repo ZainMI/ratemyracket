@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     r2_secret_access_key: str = ""
     r2_bucket: str = "data"
     r2_endpoint_url: str = ""
+    r2_prefix: str = ""
 
     admin_secret_key: str = ""
 

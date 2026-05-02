@@ -8,7 +8,7 @@ from app.core.config import settings
 
 def r2_is_configured() -> bool:
     return bool(
-        settings.r2_account_id
+        settings.r2_endpoint_url
         and settings.r2_access_key_id
         and settings.r2_secret_access_key
         and settings.r2_bucket

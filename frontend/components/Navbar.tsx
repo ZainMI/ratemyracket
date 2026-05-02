@@ -111,11 +111,9 @@ export default function Navbar() {
                     href={link.href}
                     onClick={() => setOpen(false)}
                     className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black transition ${
-                      link.href === "/predict"
-                        ? "bg-emerald-600 text-white"
-                        : active
-                          ? "bg-slate-950 text-white"
-                          : "text-slate-700 hover:bg-slate-100"
+                      active
+                        ? "bg-slate-950 text-white"
+                        : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <span>{link.label}</span>

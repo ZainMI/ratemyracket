@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     r2_bucket: str = "data"
     r2_endpoint_url: str = ""
 
+    admin_secret_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,

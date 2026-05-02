@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/predict", label: "Predict" },
   { href: "/players", label: "Players" },
   { href: "/leaderboards", label: "Leaderboards" },
+  { href: "/about", label: "About" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -25,6 +26,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
       <nav className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
           <Link
             href="/"
             onClick={() => setOpen(false)}
@@ -49,6 +51,7 @@ export default function Navbar() {
             </div>
           </Link>
 
+          {/* Desktop Nav */}
           <div className="hidden items-center gap-1 md:flex">
             {LINKS.map((link) => {
               const active = isActive(pathname, link.href);
@@ -69,6 +72,7 @@ export default function Navbar() {
             })}
           </div>
 
+          {/* Mobile Toggle */}
           <button
             onClick={() => setOpen((v) => !v)}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm md:hidden"
@@ -94,6 +98,7 @@ export default function Navbar() {
           </button>
         </div>
 
+        {/* Mobile Menu */}
         {open && (
           <div className="animate-slide-down pb-4 md:hidden">
             <div className="glass-card rounded-3xl p-2">
@@ -106,9 +111,11 @@ export default function Navbar() {
                     href={link.href}
                     onClick={() => setOpen(false)}
                     className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black transition ${
-                      active
-                        ? "bg-slate-950 text-white"
-                        : "text-slate-700 hover:bg-slate-100"
+                      link.href === "/predict"
+                        ? "bg-emerald-600 text-white"
+                        : active
+                          ? "bg-slate-950 text-white"
+                          : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <span>{link.label}</span>

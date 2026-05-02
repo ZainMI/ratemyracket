@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { getPlayerRatings, getPlayerMatches } from "@/lib/api";
 import CompactRatings from "@/components/CompactRatings";
 import MatchHistory from "@/components/MatchHistory";
+import MatchHistorySkeleton from "@/components/MatchHistorySkeleton";
 
 export default function PlayerPage({
   params,
@@ -15,22 +16,68 @@ export default function PlayerPage({
 
   const [ratings, setRatings] = useState<any>(null);
   const [matches, setMatches] = useState<any[]>([]);
+  const [ratingsLoading, setRatingsLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const r = await getPlayerRatings(playerKey);
-      const m = await getPlayerMatches(playerKey);
-      setRatings(r);
-      setMatches(m);
+    let cancelled = false;
+
+    async function loadPlayer() {
+      setRatings(null);
+      setMatches([]);
+      setRatingsLoading(true);
+      setMatchesLoading(true);
+
+      try {
+        const [ratingsData, matchesData] = await Promise.all([
+          getPlayerRatings(playerKey),
+          getPlayerMatches(playerKey),
+        ]);
+
+        if (!cancelled) {
+          setRatings(ratingsData);
+          setMatches(Array.isArray(matchesData) ? matchesData : []);
+        }
+      } finally {
+        if (!cancelled) {
+          setRatingsLoading(false);
+          setMatchesLoading(false);
+        }
+      }
     }
 
-    load();
+    loadPlayer();
+
+    return () => {
+      cancelled = true;
+    };
   }, [playerKey]);
 
   return (
     <div className="space-y-8">
-      {ratings && <CompactRatings title="Player Ratings" ratings={ratings} />}
-      <MatchHistory matches={matches} />
+      {ratingsLoading ? (
+        <section className="glass-card rounded-3xl p-4 sm:p-6">
+          <div className="mb-4 h-5 w-36 animate-pulse rounded bg-slate-200" />
+          <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-xl bg-slate-100"
+              />
+            ))}
+          </div>
+        </section>
+      ) : (
+        ratings && <CompactRatings title="Player Ratings" ratings={ratings} />
+      )}
+
+      {matchesLoading ? (
+        <MatchHistorySkeleton />
+      ) : (
+        <MatchHistory matches={matches} />
+      )}
     </div>
   );
 }

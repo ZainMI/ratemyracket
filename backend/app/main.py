@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,6 +15,8 @@ from app.db.session import init_db
 
 # ML
 from app.services.predictor_service import ensure_model_loaded
+from app.core.config import get_allowed_origins, settings
+from app.services.r2_storage import download_r2_prefix
 
 # -------------------------------------------------
 # App init
@@ -26,12 +30,9 @@ app = FastAPI(
 # -------------------------------------------------
 # Middleware (CORS for frontend)
 # -------------------------------------------------
-
-ALLOWED_ORIGINS = ["*"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=get_allowed_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,6 +48,11 @@ def startup():
 
     # Initialize database tables
     init_db()
+
+    download_r2_prefix(
+        local_dir=settings.ml_data_dir,
+        prefix="",
+    )
 
     # Load ML model into memory
     ensure_model_loaded()

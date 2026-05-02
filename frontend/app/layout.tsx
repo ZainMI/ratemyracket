@@ -4,12 +4,13 @@ import PageTransition from "@/components/PageTransition";
 
 export const metadata = {
   title: {
-    default: "Rate My Racket",
+    default: "RateMyRacket",
     template: "%s | RateMyRacket",
   },
-  description: "Compare, predict, and explore Racketlon player ratings.",
+  description: "Compare, predict, and explore Racketlon player ratings",
   icons: {
-    icon: "/logo-icon-white.png",
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
 };
 

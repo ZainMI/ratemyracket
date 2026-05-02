@@ -69,17 +69,3 @@ body {
     transform: translateY(0);
   }
 }
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.logo-float {
-  animation: float 4s ease-in-out infinite;
-}

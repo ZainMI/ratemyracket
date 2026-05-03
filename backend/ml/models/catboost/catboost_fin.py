@@ -606,111 +606,173 @@ class PredictorPackage:
             metadata=metadata,
         )
 
-    def predict_pair(self, player1_key, player2_key):
-        total_p1 = 0
-        total_p2 = 0
-        sports_out = {}
 
-        p1_state = self.get_player_state(player1_key)
-        p2_state = self.get_player_state(player2_key)
+def predict_pair(self, player1_key, player2_key):
+    requested_p1 = player1_key
+    requested_p2 = player2_key
 
-        p1_name = p1_state.get("player_name", player1_key)
-        p2_name = p2_state.get("player_name", player2_key)
+    internal_p1, internal_p2 = sorted([player1_key, player2_key])
+    flipped = requested_p1 != internal_p1
 
-        for sport in SPORTS:
-            pack = self.models[sport]
+    result = self._predict_pair_ordered(internal_p1, internal_p2)
 
-            row = build_synthetic_match_row(
-                self.inference_state,
-                player1_key,
-                player2_key,
-                pack["all_feat_cols"],
-            )
+    if not flipped:
+        return result
 
-            X_base = pd.DataFrame(
-                [row[pack["base_feat_cols"]].to_dict()]
-            ).fillna(0.0)
-            X_resid = pd.DataFrame(
-                [row[pack["resid_feat_cols"]].to_dict()]
-            ).fillna(0.0)
-            X_total = pd.DataFrame(
-                [row[pack["total_feat_cols"]].to_dict()]
-            ).fillna(0.0)
+    return self._flip_prediction_result(
+        result=result,
+        requested_p1=requested_p1,
+        requested_p2=requested_p2,
+    )
 
-            base_pred = float(pack["model_diff_base"].predict(X_base)[0])
 
-            X_resid = X_resid.copy()
-            X_resid["base_pred_diff"] = base_pred
-            X_resid["abs_base_pred_diff"] = abs(base_pred)
+def _predict_pair_ordered(self, player1_key, player2_key):
+    total_p1 = 0
+    total_p2 = 0
+    sports_out = {}
 
-            resid_pred = float(pack["model_diff_resid"].predict(X_resid)[0])
+    p1_state = self.get_player_state(player1_key)
+    p2_state = self.get_player_state(player2_key)
 
-            pred_diff_raw = base_pred + RESIDUAL_SCALE * resid_pred
+    p1_name = p1_state.get("player_name", player1_key)
+    p2_name = p2_state.get("player_name", player2_key)
 
-            pred_diff = float(
-                np.clip(
-                    apply_linear_calibrator(
-                        np.array([pred_diff_raw]),
-                        pack["diff_calibrator"],
-                    )[0],
-                    -21,
-                    21,
-                )
-            )
+    for sport in SPORTS:
+        pack = self.models[sport]
 
-            pred_total = float(
-                np.clip(pack["model_total"].predict(X_total)[0], 0, 42)
-            )
-
-            if sport in ["TT", "BD", "SQ"]:
-                s1, s2 = decode_full_game_score(pred_diff, pred_total)
-            else:
-                if PREDICT_TENNIS_INDEPENDENTLY:
-                    s1, s2 = decode_full_game_score(pred_diff, pred_total)
-                else:
-                    s1, s2 = decode_tennis_score(
-                        pred_diff,
-                        pred_total,
-                        total_p1 - total_p2,
-                    )
-
-            s1 = int(s1)
-            s2 = int(s2)
-
-            total_p1 += s1
-            total_p2 += s2
-
-            sports_out[sport] = {
-                "score_p1": s1,
-                "score_p2": s2,
-                "base_pred_diff": float(base_pred),
-                "resid_pred_diff": float(resid_pred),
-                "pred_diff": float(pred_diff),
-                "pred_total": float(pred_total),
-            }
-
-        total_p1 = int(total_p1)
-        total_p2 = int(total_p2)
-        total_diff = int(total_p1 - total_p2)
-
-        winner = (
-            p1_name if total_diff > 0 else p2_name if total_diff < 0 else "Draw"
+        row = build_synthetic_match_row(
+            self.inference_state,
+            player1_key,
+            player2_key,
+            pack["all_feat_cols"],
         )
 
-        return {
-            "player1": player1_key,
-            "player2": player2_key,
-            "player1_key": player1_key,
-            "player2_key": player2_key,
-            "player1_name": p1_name,
-            "player2_name": p2_name,
-            "sports": sports_out,
-            # official displayed prediction totals
-            "total_p1": total_p1,
-            "total_p2": total_p2,
-            "total_diff": total_diff,
-            "winner": winner,
+        X_base = pd.DataFrame([row[pack["base_feat_cols"]].to_dict()]).fillna(
+            0.0
+        )
+        X_resid = pd.DataFrame([row[pack["resid_feat_cols"]].to_dict()]).fillna(
+            0.0
+        )
+        X_total = pd.DataFrame([row[pack["total_feat_cols"]].to_dict()]).fillna(
+            0.0
+        )
+
+        base_pred = float(pack["model_diff_base"].predict(X_base)[0])
+
+        X_resid = X_resid.copy()
+        X_resid["base_pred_diff"] = base_pred
+        X_resid["abs_base_pred_diff"] = abs(base_pred)
+
+        resid_pred = float(pack["model_diff_resid"].predict(X_resid)[0])
+        pred_diff_raw = base_pred + RESIDUAL_SCALE * resid_pred
+
+        pred_diff = float(
+            np.clip(
+                apply_linear_calibrator(
+                    np.array([pred_diff_raw]),
+                    pack["diff_calibrator"],
+                )[0],
+                -21,
+                21,
+            )
+        )
+
+        pred_total = float(
+            np.clip(pack["model_total"].predict(X_total)[0], 0, 42)
+        )
+
+        if sport in ["TT", "BD", "SQ"]:
+            s1, s2 = decode_full_game_score(pred_diff, pred_total)
+        else:
+            if PREDICT_TENNIS_INDEPENDENTLY:
+                s1, s2 = decode_full_game_score(pred_diff, pred_total)
+            else:
+                s1, s2 = decode_tennis_score(
+                    pred_diff,
+                    pred_total,
+                    total_p1 - total_p2,
+                )
+
+        s1 = int(s1)
+        s2 = int(s2)
+
+        total_p1 += s1
+        total_p2 += s2
+
+        sports_out[sport] = {
+            "score_p1": s1,
+            "score_p2": s2,
+            "base_pred_diff": float(base_pred),
+            "resid_pred_diff": float(resid_pred),
+            "pred_diff": float(pred_diff),
+            "pred_total": float(pred_total),
         }
+
+    total_p1 = int(total_p1)
+    total_p2 = int(total_p2)
+    total_diff = int(total_p1 - total_p2)
+
+    winner = (
+        p1_name if total_diff > 0 else p2_name if total_diff < 0 else "Draw"
+    )
+
+    return {
+        "player1": player1_key,
+        "player2": player2_key,
+        "player1_key": player1_key,
+        "player2_key": player2_key,
+        "player1_name": p1_name,
+        "player2_name": p2_name,
+        "sports": sports_out,
+        "total_p1": total_p1,
+        "total_p2": total_p2,
+        "total_diff": total_diff,
+        "winner": winner,
+    }
+
+
+def _flip_prediction_result(self, result, requested_p1, requested_p2):
+    p1_state = self.get_player_state(requested_p1)
+    p2_state = self.get_player_state(requested_p2)
+
+    p1_name = p1_state.get("player_name", requested_p1)
+    p2_name = p2_state.get("player_name", requested_p2)
+
+    flipped_sports = {}
+
+    for sport, pred in result["sports"].items():
+        flipped_sports[sport] = {
+            **pred,
+            "score_p1": pred["score_p2"],
+            "score_p2": pred["score_p1"],
+            "base_pred_diff": -float(pred["base_pred_diff"]),
+            "resid_pred_diff": -float(pred["resid_pred_diff"]),
+            "pred_diff": -float(pred["pred_diff"]),
+            "pred_total": float(pred["pred_total"]),
+        }
+
+    total_p1 = int(result["total_p2"])
+    total_p2 = int(result["total_p1"])
+    total_diff = int(total_p1 - total_p2)
+
+    winner = (
+        p1_name if total_diff > 0 else p2_name if total_diff < 0 else "Draw"
+    )
+
+    return {
+        **result,
+        "player1": requested_p1,
+        "player2": requested_p2,
+        "player1_key": requested_p1,
+        "player2_key": requested_p2,
+        "player1_name": p1_name,
+        "player2_name": p2_name,
+        "sports": flipped_sports,
+        "total_p1": total_p1,
+        "total_p2": total_p2,
+        "total_diff": total_diff,
+        "winner": winner,
+    }
 
     def get_player_state(self, player_key):
         state = self.inference_state["player_states_by_key"].get(player_key)

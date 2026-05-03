@@ -74,6 +74,70 @@ def ensure_dir(path):
     return p
 
 
+def augment_with_mirrored_rows(df: pd.DataFrame) -> pd.DataFrame:
+    mirrored = df.copy()
+
+    for a, b in [("p1_name", "p2_name"), ("p1_key", "p2_key")]:
+        if a in mirrored.columns and b in mirrored.columns:
+            mirrored[a], mirrored[b] = mirrored[b].copy(), mirrored[a].copy()
+
+    cols = list(mirrored.columns)
+
+    for col in cols:
+        if "_p1" in col:
+            other = col.replace("_p1", "_p2")
+            if other in mirrored.columns:
+                mirrored[col], mirrored[other] = (
+                    mirrored[other].copy(),
+                    mirrored[col].copy(),
+                )
+
+    target_diff_cols = {f"{sport}_y_diff" for sport in SPORTS}
+    target_diff_cols.add("y_total_diff")
+
+    for col in target_diff_cols:
+        if col in mirrored.columns:
+            mirrored[col] = -mirrored[col]
+
+    if "y_winner_p1" in mirrored.columns:
+        mirrored["y_winner_p1"] = 1 - mirrored["y_winner_p1"]
+
+    if "rating_winner_p1" in mirrored.columns:
+        mirrored["rating_winner_p1"] = 1 - mirrored["rating_winner_p1"]
+
+    for col in mirrored.columns:
+        if col in target_diff_cols:
+            continue
+
+        should_negate = (
+            col.endswith("_diff")
+            or col.endswith("_diff_p1_p2")
+            or col.endswith("_avg_diff_p1")
+        )
+
+        if should_negate and pd.api.types.is_numeric_dtype(mirrored[col]):
+            mirrored[col] = -mirrored[col]
+
+    for col in mirrored.columns:
+        if col.endswith("_winrate_p1") and pd.api.types.is_numeric_dtype(
+            mirrored[col]
+        ):
+            mirrored[col] = 1.0 - mirrored[col]
+
+    df = df.copy()
+    df["is_mirrored_row"] = 0
+    mirrored["is_mirrored_row"] = 1
+
+    out = pd.concat([df, mirrored], ignore_index=True)
+
+    if "datetime" in out.columns:
+        out = out.sort_values(["datetime", "is_mirrored_row"]).reset_index(
+            drop=True
+        )
+
+    return out
+
+
 def read_data(path):
     df = pd.read_csv(path, low_memory=False)
     if "datetime" in df.columns:
@@ -82,6 +146,7 @@ def read_data(path):
     for col in ["p1_name", "p2_name", "p1_key", "p2_key"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.lower()
+    df = augment_with_mirrored_rows(df)
     return df
 
 
@@ -300,6 +365,7 @@ def get_feature_columns(df):
         "y_total_diff",
         "y_winner_p1",
         "rating_winner_p1",
+        "is_mirrored_row",
     }
 
     feature_cols = []

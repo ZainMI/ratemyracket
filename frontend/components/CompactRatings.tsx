@@ -1,4 +1,5 @@
 import { SPORT_META, SPORTS } from "@/lib/sportColors";
+import FavoriteButton from "@/components/FavoriteButton";
 
 export default function CompactRatings({
   title,
@@ -9,20 +10,35 @@ export default function CompactRatings({
 }) {
   if (!ratings) return null;
 
+  const favoritePlayer = {
+    player_key: ratings.player_key || ratings.player_name,
+    player_name: ratings.player_name,
+    country: ratings.country || "",
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          {title}
-        </p>
-        <h3 className="text-lg font-black capitalize text-slate-950">
-          {ratings.player_name}
-        </h3>
-        <p className="text-xs font-bold uppercase text-slate-500">
-          {ratings.country || "Unknown"}
-        </p>
+      {/* HEADER */}
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            {title}
+          </p>
+
+          <h3 className="text-lg font-black capitalize text-slate-950">
+            {ratings.player_name}
+          </h3>
+
+          <p className="text-xs font-bold uppercase text-slate-500">
+            {ratings.country || "Unknown"}
+          </p>
+        </div>
+
+        {/* ⭐ Favorite button */}
+        <FavoriteButton player={favoritePlayer} />
       </div>
 
+      {/* RATINGS GRID */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {SPORTS.map((sport) => {
           const meta = SPORT_META[sport];

@@ -1,6 +1,7 @@
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: {
@@ -80,6 +81,7 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+        <Analytics />
       </body>
     </html>
   );

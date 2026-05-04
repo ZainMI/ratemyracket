@@ -24,12 +24,10 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col">
         <Navbar />
 
-        {/* Main content */}
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <PageTransition>{children}</PageTransition>
         </main>
 
-        {/* Footer */}
         <footer className="border-t border-slate-200 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-6 text-sm text-slate-600 sm:px-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -55,13 +53,30 @@ export default function RootLayout({
                 <p className="mt-1">
                   Contact:{" "}
                   <a
-                    href="mailto:your-email@example.com"
+                    href="mailto:zainmagdon@gmail.com"
                     className="text-emerald-600 hover:underline"
                   >
                     zainmagdon@gmail.com
                   </a>
                 </p>
+                <p className="mt-1">
+                  <a
+                    href="https://docs.google.com/forms/d/e/1FAIpQLSf3xff7KwTyutMr08EZgTEJuSGOlOQzsaqu36qXIleq5qg4Og/viewform?usp=publish-editor"
+                    target="_blank"
+                    className="text-slate-500 hover:text-slate-900 hover:underline"
+                  >
+                    Report a bug / Leave feedback
+                  </a>
+                </p>
               </div>
+            </div>
+
+            {/* Disclaimer */}
+            <div className="mt-5 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-400">
+              Ratings and predictions are data-driven estimates, not official
+              rankings. They may be influenced by match volume, recent activity,
+              opponent strength, and the level of competition a player typically
+              faces.
             </div>
           </div>
         </footer>

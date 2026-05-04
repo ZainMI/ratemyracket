@@ -1,3 +1,5 @@
+import FavoriteButton from "@/components/FavoriteButton";
+
 const SPORTS = [
   { key: "TT", label: "Table Tennis" },
   { key: "BD", label: "Badminton" },
@@ -14,16 +16,26 @@ export default function PlayerRatingsCard({
 }) {
   if (!ratings) return null;
 
+  const favoritePlayer = {
+    player_key: ratings.player_key,
+    player_name: ratings.player_name,
+    country: ratings.country || "",
+  };
+
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-4">
-        <p className="text-sm text-gray-500">{title}</p>
-        <h3 className="text-xl font-bold capitalize text-gray-950">
-          {ratings.player_name}
-        </h3>
-        <p className="text-sm text-gray-600">
-          {ratings.country || "Unknown country"}
-        </p>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm text-gray-500">{title}</p>
+          <h3 className="text-xl font-bold capitalize text-gray-950">
+            {ratings.player_name}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {ratings.country || "Unknown country"}
+          </p>
+        </div>
+
+        {ratings.player_key && <FavoriteButton player={favoritePlayer} />}
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">

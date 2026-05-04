@@ -115,6 +115,26 @@ export default function AboutPage() {
         </p>
       </section>
 
+      {/* Disclaimer */}
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm sm:p-6">
+        <h2 className="text-lg font-black text-amber-900">
+          Interpreting the results
+        </h2>
+
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-800">
+          These ratings and predictions are data-driven estimates, not official
+          rankings. Their accuracy depends on the amount of available match
+          data, how recently a player has competed, and the level of opponents
+          they typically face.
+        </p>
+
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-800">
+          Players with fewer matches or highly uneven competition histories may
+          have less stable ratings, and predictions for those matchups may be
+          less reliable.
+        </p>
+      </section>
+
       {/* SPORT LEVEL */}
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <p className="text-xs font-black uppercase tracking-wide text-slate-500">

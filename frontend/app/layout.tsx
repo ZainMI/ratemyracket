@@ -54,10 +54,10 @@ export default function RootLayout({
                 <p className="mt-1">
                   Contact:{" "}
                   <a
-                    href="mailto:zainmagdon@gmail.com"
+                    href="mailto:zain@ratemyracket.com"
                     className="text-emerald-600 hover:underline"
                   >
-                    zainmagdon@gmail.com
+                    zain@ratemyracket.com
                   </a>
                 </p>
                 <p className="mt-1">

@@ -116,12 +116,32 @@ export default function HomePage() {
         ))}
       </section>
 
+      {/* ORGANIZATIONS */}
+      <section className="rounded-[2rem] border border-slate-200 bg-white px-6 py-8 shadow-sm">
+        <div className="flex flex-col items-center justify-center text-center">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">
+            Used by players & organizations
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-10">
+            <Image
+              src="/usa_racketlon.png"
+              alt="USA Racketlon"
+              width={420}
+              height={160}
+              className="h-24 w-auto object-contain opacity-90 transition hover:opacity-100"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* SPORTS */}
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-4">
           <p className="text-xs font-black uppercase tracking-wide text-slate-500">
             Four sports. One score.
           </p>
+
           <h2 className="mt-1 text-2xl font-black text-slate-950">
             Built for the full Racketlon format.
           </h2>

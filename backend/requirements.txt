@@ -62,7 +62,6 @@ SQLAlchemy==2.0.49
 starlette==1.0.0
 sympy==1.14.0
 threadpoolctl==3.6.0
-torch==2.11.0
 tqdm==4.67.1
 trio==0.32.0
 trio-typing==0.10.0

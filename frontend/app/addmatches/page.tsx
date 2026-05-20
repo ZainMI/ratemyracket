@@ -4,6 +4,7 @@ import React, { useState } from "react";
 
 type MatchData = {
   match_date: string;
+  match_time: string;
   draw: string;
   round_name: string;
   p1_first_name: string;
@@ -25,6 +26,7 @@ type MatchData = {
 
 const defaultMatch: MatchData = {
   match_date: new Date().toISOString().split("T")[0],
+  match_time: "10:30 AM",
   draw: "Men A - Elite",
   round_name: "",
   p1_first_name: "",
@@ -71,17 +73,18 @@ export default function BulkAddMatchesPage() {
   };
 
   const removeMatch = (index: number) => {
-    const updated = matches.filter((_, i) => i !== index);
-    setMatches(updated);
+    setMatches(matches.filter((_, i) => i !== index));
   };
 
   const autoCalculateWinner = (index: number) => {
     const m = matches[index];
+
     const p1Total =
       (Number(m.tt_p1) || 0) +
       (Number(m.bd_p1) || 0) +
       (Number(m.sq_p1) || 0) +
       (Number(m.tn_p1) || 0);
+
     const p2Total =
       (Number(m.tt_p2) || 0) +
       (Number(m.bd_p2) || 0) +
@@ -94,22 +97,23 @@ export default function BulkAddMatchesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setStatus({
       type: "loading",
       message: "Uploading matches and triggering pipeline...",
     });
 
-    // Clean up empty strings to nulls where required by backend
     const cleanedMatches = matches.map((m) => ({
       ...m,
-      tt_p1: m.tt_p1 === "" ? null : m.tt_p1,
-      tt_p2: m.tt_p2 === "" ? null : m.tt_p2,
-      bd_p1: m.bd_p1 === "" ? null : m.bd_p1,
-      bd_p2: m.bd_p2 === "" ? null : m.bd_p2,
-      sq_p1: m.sq_p1 === "" ? null : m.sq_p1,
-      sq_p2: m.sq_p2 === "" ? null : m.sq_p2,
-      tn_p1: m.tn_p1 === "" ? null : m.tn_p1,
-      tn_p2: m.tn_p2 === "" ? null : m.tn_p2,
+      tt_p1: m.tt_p1 === "" ? null : Number(m.tt_p1),
+      tt_p2: m.tt_p2 === "" ? null : Number(m.tt_p2),
+      bd_p1: m.bd_p1 === "" ? null : Number(m.bd_p1),
+      bd_p2: m.bd_p2 === "" ? null : Number(m.bd_p2),
+      sq_p1: m.sq_p1 === "" ? null : Number(m.sq_p1),
+      sq_p2: m.sq_p2 === "" ? null : Number(m.sq_p2),
+      tn_p1: m.tn_p1 === "" ? null : Number(m.tn_p1),
+      tn_p2: m.tn_p2 === "" ? null : Number(m.tn_p2),
+      winner_side: m.winner_side === "" ? null : Number(m.winner_side),
     }));
 
     const payload = {
@@ -119,6 +123,7 @@ export default function BulkAddMatchesPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
       const res = await fetch(`${apiUrl}/admin/matches/bulk`, {
         method: "POST",
         headers: {
@@ -139,12 +144,11 @@ export default function BulkAddMatchesPage() {
         type: "success",
         message: `Successfully added ${data.matches_added} matches! ML Pipeline started in the background.`,
       });
-
-      // Optionally clear the form after success
-      // setMatches([{ ...defaultMatch }]);
-      // setTournamentName("");
     } catch (err: any) {
-      setStatus({ type: "error", message: err.message });
+      setStatus({
+        type: "error",
+        message: err.message,
+      });
     }
   };
 
@@ -157,26 +161,25 @@ export default function BulkAddMatchesPage() {
               Bulk Add Matches
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Add multiple matches under a single tournament. Uploads to R2 and
-              auto-retrains the model.
+              Add multiple matches under a single tournament.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="px-4 py-5 sm:px-6 space-y-6">
-            {/* Global Settings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-gray-200">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Password (Upload or Admin)
+                  Password
                 </label>
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 sm:text-sm"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Tournament Name
@@ -184,15 +187,14 @@ export default function BulkAddMatchesPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Summer Open 2024"
+                  placeholder="e.g. Sweden Open"
                   value={tournamentName}
                   onChange={(e) => setTournamentName(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 sm:text-sm"
                 />
               </div>
             </div>
 
-            {/* Matches List */}
             <div className="space-y-8">
               {matches.map((match, index) => (
                 <div
@@ -207,6 +209,7 @@ export default function BulkAddMatchesPage() {
                     >
                       Auto-Calc Winner
                     </button>
+
                     {matches.length > 1 && (
                       <button
                         type="button"
@@ -222,11 +225,10 @@ export default function BulkAddMatchesPage() {
                     Match #{index + 1}
                   </h4>
 
-                  {/* Details Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700">
-                        Date (YYYY-MM-DD)
+                        Date
                       </label>
                       <input
                         type="date"
@@ -238,6 +240,23 @@ export default function BulkAddMatchesPage() {
                         className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700">
+                        Time
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="10:30 AM"
+                        value={match.match_time}
+                        onChange={(e) =>
+                          handleMatchChange(index, "match_time", e.target.value)
+                        }
+                        className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm"
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-700">
                         Draw
@@ -252,9 +271,10 @@ export default function BulkAddMatchesPage() {
                         className="mt-1 block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-700">
-                        Round (Optional)
+                        Round
                       </label>
                       <input
                         type="text"
@@ -267,9 +287,7 @@ export default function BulkAddMatchesPage() {
                     </div>
                   </div>
 
-                  {/* Players Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 border-t border-gray-200 pt-4">
-                    {/* Player 1 */}
                     <div className="space-y-3">
                       <h5 className="text-sm font-semibold text-gray-600">
                         Player 1
@@ -305,21 +323,21 @@ export default function BulkAddMatchesPage() {
                         />
                         <input
                           type="text"
-                          placeholder="Country (SWE)"
+                          placeholder="Country"
                           required
                           value={match.p1_country}
                           onChange={(e) =>
                             handleMatchChange(
                               index,
                               "p1_country",
-                              e.target.value,
+                              e.target.value.toUpperCase(),
                             )
                           }
                           className="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm uppercase"
                         />
                       </div>
                     </div>
-                    {/* Player 2 */}
+
                     <div className="space-y-3">
                       <h5 className="text-sm font-semibold text-gray-600">
                         Player 2
@@ -355,14 +373,14 @@ export default function BulkAddMatchesPage() {
                         />
                         <input
                           type="text"
-                          placeholder="Country (USA)"
+                          placeholder="Country"
                           required
                           value={match.p2_country}
                           onChange={(e) =>
                             handleMatchChange(
                               index,
                               "p2_country",
-                              e.target.value,
+                              e.target.value.toUpperCase(),
                             )
                           }
                           className="block w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm uppercase"
@@ -371,11 +389,11 @@ export default function BulkAddMatchesPage() {
                     </div>
                   </div>
 
-                  {/* Scores Row */}
                   <div className="border-t border-gray-200 pt-4 mb-4">
                     <h5 className="text-sm font-semibold text-gray-600 mb-3">
-                      Scores (P1 - P2)
+                      Scores
                     </h5>
+
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
                       {["tt", "bd", "sq", "tn"].map((sport) => (
                         <div
@@ -385,6 +403,7 @@ export default function BulkAddMatchesPage() {
                           <span className="text-xs font-bold uppercase w-6">
                             {sport}
                           </span>
+
                           <input
                             type="number"
                             className="w-16 border border-gray-300 rounded py-1 text-center text-sm"
@@ -393,11 +412,15 @@ export default function BulkAddMatchesPage() {
                               handleMatchChange(
                                 index,
                                 `${sport}_p1` as keyof MatchData,
-                                e.target.value,
+                                e.target.value === ""
+                                  ? ""
+                                  : Number(e.target.value),
                               )
                             }
                           />
+
                           <span className="text-gray-500">-</span>
+
                           <input
                             type="number"
                             className="w-16 border border-gray-300 rounded py-1 text-center text-sm"
@@ -406,7 +429,9 @@ export default function BulkAddMatchesPage() {
                               handleMatchChange(
                                 index,
                                 `${sport}_p2` as keyof MatchData,
-                                e.target.value,
+                                e.target.value === ""
+                                  ? ""
+                                  : Number(e.target.value),
                               )
                             }
                           />
@@ -424,7 +449,7 @@ export default function BulkAddMatchesPage() {
                             handleMatchChange(
                               index,
                               "winner_side",
-                              parseFloat(e.target.value),
+                              Number(e.target.value),
                             )
                           }
                           className="w-full border border-gray-300 rounded shadow-sm py-1.5 px-2 text-sm bg-white"
@@ -432,8 +457,8 @@ export default function BulkAddMatchesPage() {
                           <option value="" disabled>
                             Select
                           </option>
-                          <option value={1.0}>P1</option>
-                          <option value={2.0}>P2</option>
+                          <option value={1}>P1</option>
+                          <option value={2}>P2</option>
                         </select>
                       </div>
                     </div>
@@ -442,7 +467,6 @@ export default function BulkAddMatchesPage() {
               ))}
             </div>
 
-            {/* Controls */}
             <div className="flex items-center justify-between pt-4">
               <button
                 type="button"
@@ -463,7 +487,6 @@ export default function BulkAddMatchesPage() {
               </button>
             </div>
 
-            {/* Status Messages */}
             {status.message && (
               <div
                 className={`p-4 rounded-md mt-4 ${

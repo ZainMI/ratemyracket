@@ -99,8 +99,8 @@ export default function BulkAddMatchesPage() {
     e.preventDefault();
 
     setStatus({
-      type: "loading",
-      message: "Uploading matches and triggering pipeline...",
+      type: "success",
+      message: "Upload started.",
     });
 
     const cleanedMatches = matches.map((m) => ({

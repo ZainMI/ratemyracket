@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import PlayerSearch from "@/components/PlayerSearch";
+import type { Player } from "@/lib/types";
 
 interface Match {
   id: string;
@@ -11,14 +13,13 @@ interface Match {
 }
 
 export default function DeleteMatchesPage() {
-  const [playerName, setPlayerName] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const searchMatches = async () => {
-    if (!playerName.trim()) return;
+  const searchMatches = async (name: string) => {
+    if (!name.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -26,7 +27,7 @@ export default function DeleteMatchesPage() {
 
     try {
       const res = await fetch(
-        `/api/admin/matches/search?player_name=${encodeURIComponent(playerName)}`,
+        `/api/admin/matches/search?player_name=${encodeURIComponent(name)}`,
         {
           headers: {
             // Replace with your actual admin secret or use an env variable
@@ -41,7 +42,7 @@ export default function DeleteMatchesPage() {
       const data = await res.json();
       setMatches(data);
       if (data.length === 0) {
-        setError(`No matches found for "${playerName}".`);
+        setError(`No matches found for "${name}".`);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred while searching.");
@@ -89,23 +90,16 @@ export default function DeleteMatchesPage() {
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <input
-          type="text"
-          placeholder="Enter player name (e.g., John Doe)"
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && searchMatches()}
-          className="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-900"
+      <div className="mb-8 max-w-md">
+        <PlayerSearch
+          label="Select a Player"
+          onSelect={(player: Player) => searchMatches(player.player_name)}
         />
-        <button
-          onClick={searchMatches}
-          disabled={loading || !playerName.trim()}
-          className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? "Searching..." : "Search"}
-        </button>
       </div>
+
+      {loading && (
+        <p className="mb-6 text-gray-600 text-sm">Loading matches...</p>
+      )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">

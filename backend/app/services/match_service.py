@@ -5,8 +5,8 @@ from pathlib import Path
 from app.core.config import settings
 
 # Use settings to define paths
-ADDED_DATA_FILE = settings.ml_data_dir / "added_data.csv"
-TOURNAMENT_MAPPING_FILE = settings.ml_data_dir / "tournament_mapping.csv"
+ADDED_DATA_FILE = Path(settings.ml_data_dir) / "added_data.csv"
+TOURNAMENT_MAPPING_FILE = Path(settings.ml_data_dir) / "tournament_mapping.csv"
 
 HEADERS = [
     "mode",

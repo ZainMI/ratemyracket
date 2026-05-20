@@ -6,6 +6,7 @@ backend/ml/pipeline.py
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -211,6 +212,38 @@ def run_pipeline(
         )
 
     print("\n[4/6] Cleaning and deduplicating full match history...")
+
+    deleted_matches_csv = data_dir / "deleted_matches.csv"
+    if deleted_matches_csv.exists() and deleted_matches_csv.stat().st_size > 0:
+        deleted_df = pd.read_csv(deleted_matches_csv)
+        if "match_id" in deleted_df.columns:
+            deleted_ids = set(deleted_df["match_id"].astype(str))
+
+            raw_df = pd.read_csv(raw_matches_csv, low_memory=False)
+
+            def compute_hash(row):
+                keys = [
+                    "tournament_id",
+                    "match_date",
+                    "team1_players",
+                    "team2_players",
+                    "raw_points",
+                ]
+                vals = [str(row.get(k, "")) for k in keys]
+                return hashlib.md5("|".join(vals).encode("utf-8")).hexdigest()
+
+            if not raw_df.empty:
+                raw_df["_match_hash"] = raw_df.apply(compute_hash, axis=1)
+                before_len = len(raw_df)
+                raw_df = raw_df[~raw_df["_match_hash"].isin(deleted_ids)]
+                raw_df = raw_df.drop(columns=["_match_hash"])
+                after_len = len(raw_df)
+
+                if before_len != after_len:
+                    print(
+                        f"Filtered out {before_len - after_len} deleted matches."
+                    )
+                    raw_df.to_csv(raw_matches_csv, index=False)
 
     clean_matches(
         input_csv=str(raw_matches_csv),

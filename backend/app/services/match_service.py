@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import uuid
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from app.core.config import settings
 # Use settings to define paths
 ADDED_DATA_FILE = Path(settings.ml_data_dir) / "added_data.csv"
 TOURNAMENT_MAPPING_FILE = Path(settings.ml_data_dir) / "tournament_mapping.csv"
+DELETED_MATCHES_FILE = Path(settings.ml_data_dir) / "deleted_matches.csv"
 
 HEADERS = [
     "mode",
@@ -193,3 +195,65 @@ def add_match(**kwargs):
     row = build_match_row(**kwargs)
     append_match_row(row)
     return row
+
+
+def get_match_hash(row: dict) -> str:
+    keys = [
+        "tournament_id",
+        "match_date",
+        "team1_players",
+        "team2_players",
+        "raw_points",
+    ]
+    vals = [str(row.get(k, "")) for k in keys]
+    return hashlib.md5("|".join(vals).encode("utf-8")).hexdigest()
+
+
+def search_matches(player_name: str):
+    matches_file = Path(settings.ml_data_dir) / "matches_raw.csv"
+    if not matches_file.exists():
+        matches_file = ADDED_DATA_FILE
+
+    if not matches_file.exists():
+        return []
+
+    results = []
+    player_name_lower = player_name.lower()
+
+    with matches_file.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            team1 = row.get("team1_players", "")
+            team2 = row.get("team2_players", "")
+            if (
+                player_name_lower in team1.lower()
+                or player_name_lower in team2.lower()
+            ):
+                results.append(
+                    {
+                        "id": get_match_hash(row),
+                        "match_date": row.get("match_date"),
+                        "tournament_id": row.get("tournament_id"),
+                        "team1_players": team1,
+                        "team2_players": team2,
+                    }
+                )
+
+    # Deduplicate
+    unique_results = []
+    seen = set()
+    for r in results:
+        if r["id"] not in seen:
+            seen.add(r["id"])
+            unique_results.append(r)
+
+    unique_results.sort(key=lambda x: x["match_date"] or "", reverse=True)
+    return unique_results[:50]
+
+
+def delete_match(match_id: str):
+    ensure_csv_exists(DELETED_MATCHES_FILE, ["match_id"])
+    with DELETED_MATCHES_FILE.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["match_id"])
+        writer.writerow({"match_id": match_id})
+    return True

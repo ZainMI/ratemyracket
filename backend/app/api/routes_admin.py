@@ -201,7 +201,18 @@ def delete_match(
 ):
     verify_admin_secret(x_admin_secret)
 
+    download_r2_prefix(
+        local_dir=settings.ml_data_dir,
+        prefix=settings.r2_prefix,
+    )
+
     match_service.delete_match(match_id)
+
+    upload_directory_to_r2(
+        local_dir=settings.ml_data_dir,
+        prefix=settings.r2_prefix,
+    )
+
     return {
         "status": "ok",
         "message": f"Match {match_id} successfully deleted.",

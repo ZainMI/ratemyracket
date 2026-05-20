@@ -9,9 +9,6 @@ from app.api.routes_players import router as players_router
 from app.api.routes_predict import router as predict_router
 from app.api.routes_admin import router as admin_router
 
-# Core / DB
-from app.db.session import init_db
-
 # ML
 from app.services.predictor_service import ensure_model_loaded
 from app.core.config import get_allowed_origins, settings
@@ -44,9 +41,6 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     print("Starting API...")
-
-    # Initialize database tables
-    init_db()
 
     download_r2_prefix(
         local_dir=settings.ml_data_dir,

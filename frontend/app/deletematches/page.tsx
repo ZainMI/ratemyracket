@@ -13,6 +13,7 @@ interface Match {
 }
 
 export default function DeleteMatchesPage() {
+  const [deletePassword, setDeletePassword] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,10 @@ export default function DeleteMatchesPage() {
 
   const searchMatches = async (name: string) => {
     if (!name.trim()) return;
+    if (!deletePassword.trim()) {
+      setError("Please enter the Delete Password first.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -32,9 +37,7 @@ export default function DeleteMatchesPage() {
         `${API_URL}/admin/matches/search?player_name=${encodeURIComponent(name)}`,
         {
           headers: {
-            // Replace with your actual admin secret or use an env variable
-            "x-admin-secret":
-              process.env.NEXT_PUBLIC_ADMIN_SECRET || "your_admin_secret",
+            "x-delete-password": deletePassword,
           },
         },
       );
@@ -54,6 +57,10 @@ export default function DeleteMatchesPage() {
   };
 
   const deleteMatch = async (matchId: string) => {
+    if (!deletePassword.trim()) {
+      setError("Please enter the Delete Password first.");
+      return;
+    }
     if (
       !window.confirm("Are you sure you want to permanently delete this match?")
     ) {
@@ -69,8 +76,7 @@ export default function DeleteMatchesPage() {
       const res = await fetch(`${API_URL}/admin/matches/${matchId}`, {
         method: "DELETE",
         headers: {
-          "x-admin-secret":
-            process.env.NEXT_PUBLIC_ADMIN_SECRET || "your_admin_secret",
+          "x-delete-password": deletePassword,
         },
       });
 
@@ -95,6 +101,19 @@ export default function DeleteMatchesPage() {
       </div>
 
       <div className="mb-8 max-w-md">
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-800 mb-2">
+            Delete Password
+          </label>
+          <input
+            type="password"
+            placeholder="Enter Delete Password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-950 placeholder:text-gray-400 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          />
+        </div>
+
         <PlayerSearch
           label="Select a Player"
           onSelect={(player: Player) => searchMatches(player.player_name)}

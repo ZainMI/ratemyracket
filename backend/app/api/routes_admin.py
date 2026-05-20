@@ -188,8 +188,19 @@ def add_bulk_matches(
 def search_matches(
     player_name: str,
     x_admin_secret: str | None = Header(default=None),
+    x_delete_password: str | None = Header(default=None),
 ):
-    verify_admin_secret(x_admin_secret)
+    delete_pw = os.getenv("DELETE_PASSWORD")
+    is_admin = bool(
+        settings.admin_secret_key
+        and x_admin_secret == settings.admin_secret_key
+    )
+    is_deleter = bool(delete_pw and x_delete_password == delete_pw)
+
+    if not (is_admin or is_deleter):
+        raise HTTPException(
+            status_code=403, detail="Forbidden: Invalid password."
+        )
 
     return match_service.search_matches(player_name)
 
@@ -198,8 +209,19 @@ def search_matches(
 def delete_match(
     match_id: str,
     x_admin_secret: str | None = Header(default=None),
+    x_delete_password: str | None = Header(default=None),
 ):
-    verify_admin_secret(x_admin_secret)
+    delete_pw = os.getenv("DELETE_PASSWORD")
+    is_admin = bool(
+        settings.admin_secret_key
+        and x_admin_secret == settings.admin_secret_key
+    )
+    is_deleter = bool(delete_pw and x_delete_password == delete_pw)
+
+    if not (is_admin or is_deleter):
+        raise HTTPException(
+            status_code=403, detail="Forbidden: Invalid password."
+        )
 
     download_r2_prefix(
         local_dir=settings.ml_data_dir,

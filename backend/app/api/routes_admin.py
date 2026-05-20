@@ -182,3 +182,27 @@ def add_bulk_matches(
         "total_matches_in_payload": len(payload.matches),
         "message": "Matches are being processed in the background.",
     }
+
+
+@router.get("/matches/search")
+def search_matches(
+    player_name: str,
+    x_admin_secret: str | None = Header(default=None),
+):
+    verify_admin_secret(x_admin_secret)
+
+    return match_service.search_matches(player_name)
+
+
+@router.delete("/matches/{match_id}")
+def delete_match(
+    match_id: str,
+    x_admin_secret: str | None = Header(default=None),
+):
+    verify_admin_secret(x_admin_secret)
+
+    match_service.delete_match(match_id)
+    return {
+        "status": "ok",
+        "message": f"Match {match_id} successfully deleted.",
+    }

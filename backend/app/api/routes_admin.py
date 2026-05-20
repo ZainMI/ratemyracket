@@ -9,6 +9,7 @@ from app.services.pipeline_service import run_pipeline_background
 from app.services.r2_storage import download_r2_prefix, upload_directory_to_r2
 from app.services.player_service import clear_player_service_cache
 from app.services import match_service
+from app.services import predictor_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -131,6 +132,15 @@ def refresh_data(x_admin_secret: str | None = Header(default=None)):
     )
 
     clear_player_service_cache()
+
+    # Force reload the machine learning model and inference state into memory
+    if hasattr(predictor_service, "reload_model"):
+        predictor_service.reload_model()
+    else:
+        # Fallback: Clear standard global variables and reload
+        predictor_service._predictor = None
+        predictor_service._inference_state = None
+        predictor_service.ensure_model_loaded()
 
     return {
         "status": "ok",

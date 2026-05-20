@@ -7,32 +7,15 @@ from app.services.r2_storage import upload_directory_to_r2, download_r2_prefix
 
 
 def notify_api_refresh():
-    api_url = os.getenv("API_PUBLIC_URL", "").rstrip("/")
+    # Call the refresh function directly instead of an HTTP request.
+    # This works reliably on Railway without needing API_PUBLIC_URL.
+    from app.api.routes_admin import refresh_data
 
-    if not api_url:
-        print("API_PUBLIC_URL not configured; skipping API refresh.")
-        return {
-            "status": "skipped",
-            "reason": "API_PUBLIC_URL not configured.",
-        }
-
-    if not settings.admin_secret_key:
-        print("ADMIN_SECRET_KEY not configured; skipping API refresh.")
-        return {
-            "status": "skipped",
-            "reason": "ADMIN_SECRET_KEY not configured.",
-        }
-
-    url = f"{api_url}/admin/refresh-data"
-
-    response = requests.post(
-        url,
-        headers={"x-admin-secret": settings.admin_secret_key},
-        timeout=120,
-    )
-
-    response.raise_for_status()
-    return response.json()
+    try:
+        return refresh_data(x_admin_secret=settings.admin_secret_key)
+    except Exception as e:
+        print(f"Failed to refresh API locally: {e}")
+        return {"status": "error", "reason": str(e)}
 
 
 def run_pipeline_background():

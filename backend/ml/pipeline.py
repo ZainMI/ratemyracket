@@ -1,21 +1,6 @@
 #!/usr/bin/env python3
 """
 backend/ml/pipeline.py
-
-Self-sustaining orchestrator for RacketRating.
-
-Pipeline:
-1. Fetch tournament IDs and update tournament mapping
-2. Scrape matches
-3. Merge scraped matches into full historical raw matches
-4. Clean + deduplicate full match history
-5. Build leakage-safe features and inference state
-6. Retrain and package CatBoost predictor
-
-Important:
-- This updates files on disk.
-- If the FastAPI server is running with server-side caches, restart the backend
-  after running this pipeline so it loads the new model/state.
 """
 
 from __future__ import annotations
@@ -70,22 +55,22 @@ def remove_file_if_exists(path: Path) -> None:
         path.unlink()
 
 
-def merge_match_csvs(full_path: Path, recent_path: Path) -> None:
-    if not recent_path.exists() or recent_path.stat().st_size == 0:
-        print("No scraped matches found; skipping merge.")
+def merge_match_csvs(full_path: Path, source_path: Path) -> None:
+    if not source_path.exists() or source_path.stat().st_size == 0:
+        print(f"No matches found at {source_path}; skipping merge.")
         return
 
-    recent = pd.read_csv(recent_path, low_memory=False)
+    source = pd.read_csv(source_path, low_memory=False)
 
-    if recent.empty:
-        print("Scraped match file is empty; skipping merge.")
+    if source.empty:
+        print(f"Match file is empty: {source_path}; skipping merge.")
         return
 
     if full_path.exists() and full_path.stat().st_size > 0:
         full = pd.read_csv(full_path, low_memory=False)
-        merged = pd.concat([full, recent], ignore_index=True)
+        merged = pd.concat([full, source], ignore_index=True)
     else:
-        merged = recent
+        merged = source
 
     dedupe_cols = [
         "mode",
@@ -106,7 +91,10 @@ def merge_match_csvs(full_path: Path, recent_path: Path) -> None:
         before = len(merged)
         merged = merged.drop_duplicates(subset=dedupe_cols, keep="last")
         after = len(merged)
-        print(f"Merged raw matches: {before} rows -> {after} after dedupe.")
+        print(
+            f"Merged {source_path.name}: "
+            f"{before} rows -> {after} after dedupe."
+        )
     else:
         print("Warning: no dedupe columns found; writing without raw dedupe.")
 
@@ -129,6 +117,8 @@ def run_pipeline(
 
     raw_matches_csv = data_dir / "matches_raw.csv"
     scraped_matches_csv = data_dir / "matches_recent.csv"
+    added_data_csv = data_dir / "added_data.csv"
+
     cleaned_matches_csv = data_dir / "matches_cleaned.csv"
     feature_csv = data_dir / "data.csv"
     inference_state_path = data_dir / "inference_state.pkl"
@@ -201,17 +191,23 @@ def run_pipeline(
     else:
         print("Skipping match scrape because no tournament IDs were found.")
 
-    print("\n[3/6] Merging scraped matches into full historical match file...")
+    print("\n[3/6] Merging scraped + manually added matches...")
 
     merge_match_csvs(
         full_path=raw_matches_csv,
-        recent_path=scraped_matches_csv,
+        source_path=scraped_matches_csv,
+    )
+
+    merge_match_csvs(
+        full_path=raw_matches_csv,
+        source_path=added_data_csv,
     )
 
     if not raw_matches_csv.exists() or raw_matches_csv.stat().st_size == 0:
         raise RuntimeError(
             "No historical match file exists after merge. "
-            "Run with --full or seed ml/data/matches_raw.csv first."
+            "Run with --full, seed ml/data/matches_raw.csv, "
+            "or add rows to ml/data/added_data.csv first."
         )
 
     print("\n[4/6] Cleaning and deduplicating full match history...")
@@ -254,6 +250,7 @@ def run_pipeline(
         "tournament_mapping_csv": str(tournament_mapping_csv),
         "raw_matches_csv": str(raw_matches_csv),
         "scraped_matches_csv": str(scraped_matches_csv),
+        "added_data_csv": str(added_data_csv),
         "cleaned_matches_csv": str(cleaned_matches_csv),
         "feature_csv": str(feature_csv),
         "inference_state": str(inference_state_path),

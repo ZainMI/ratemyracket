@@ -3,7 +3,7 @@ import requests
 
 from ml.pipeline import run_pipeline
 from app.core.config import settings
-from app.services.r2_storage import upload_directory_to_r2
+from app.services.r2_storage import upload_directory_to_r2, download_r2_prefix
 
 
 def notify_api_refresh():
@@ -36,6 +36,13 @@ def notify_api_refresh():
 
 
 def run_pipeline_background():
+    # 1. Sync latest data from R2 first to ensure added_data.csv is up to date
+    download_result = download_r2_prefix(
+        local_dir=settings.ml_data_dir,
+        prefix=settings.r2_prefix,
+    )
+    print("R2 download finished:", download_result)
+
     result = run_pipeline(
         full_backfill=False,
         retrain=True,
@@ -55,6 +62,7 @@ def run_pipeline_background():
     print("API refresh finished:", refresh_result)
 
     return {
+        "r2_download": download_result,
         "pipeline": result,
         "r2_upload": upload_result,
         "api_refresh": refresh_result,

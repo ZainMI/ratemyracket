@@ -49,6 +49,13 @@ def ensure_csv_exists(file_path, headers):
         with file_path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=headers)
             writer.writeheader()
+        return
+
+    if file_path.stat().st_size > 0:
+        with file_path.open("rb+") as f:
+            f.seek(-1, 2)
+            if f.read(1) != b"\n":
+                f.write(b"\n")
 
 
 def normalize_match_date(match_date: str) -> str:

@@ -26,8 +26,10 @@ export default function DeleteMatchesPage() {
     setSuccess(null);
 
     try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(
-        `/api/admin/matches/search?player_name=${encodeURIComponent(name)}`,
+        `${API_URL}/admin/matches/search?player_name=${encodeURIComponent(name)}`,
         {
           headers: {
             // Replace with your actual admin secret or use an env variable
@@ -62,7 +64,9 @@ export default function DeleteMatchesPage() {
     setSuccess(null);
 
     try {
-      const res = await fetch(`/api/admin/matches/${matchId}`, {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API_URL}/admin/matches/${matchId}`, {
         method: "DELETE",
         headers: {
           "x-admin-secret":

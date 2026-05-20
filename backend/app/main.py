@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_health import router as health_router
 from app.api.routes_players import router as players_router
 from app.api.routes_predict import router as predict_router
-from app.api.routes_favorites import router as favorites_router
 from app.api.routes_admin import router as admin_router
 
 # Core / DB
@@ -77,5 +76,4 @@ def root():
 app.include_router(health_router)
 app.include_router(players_router)
 app.include_router(predict_router)
-app.include_router(favorites_router)
 app.include_router(admin_router)

@@ -195,11 +195,27 @@ def search_matches(
         settings.admin_secret_key
         and x_admin_secret == settings.admin_secret_key
     )
-    is_deleter = bool(delete_pw and x_delete_password == delete_pw)
+
+    # Strip whitespace to prevent copy-paste errors
+    is_deleter = bool(
+        delete_pw
+        and x_delete_password
+        and x_delete_password.strip() == delete_pw.strip()
+    )
 
     if not (is_admin or is_deleter):
+        if not delete_pw:
+            raise HTTPException(
+                status_code=403,
+                detail="Server Error: DELETE_PASSWORD env variable is missing.",
+            )
+        if not x_delete_password:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: x-delete-password header was not received by the server.",
+            )
         raise HTTPException(
-            status_code=403, detail="Forbidden: Invalid password."
+            status_code=403, detail="Forbidden: Incorrect Delete Password."
         )
 
     return match_service.search_matches(player_name)
@@ -216,11 +232,26 @@ def delete_match(
         settings.admin_secret_key
         and x_admin_secret == settings.admin_secret_key
     )
-    is_deleter = bool(delete_pw and x_delete_password == delete_pw)
+
+    is_deleter = bool(
+        delete_pw
+        and x_delete_password
+        and x_delete_password.strip() == delete_pw.strip()
+    )
 
     if not (is_admin or is_deleter):
+        if not delete_pw:
+            raise HTTPException(
+                status_code=403,
+                detail="Server Error: DELETE_PASSWORD env variable is missing.",
+            )
+        if not x_delete_password:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: x-delete-password header was not received by the server.",
+            )
         raise HTTPException(
-            status_code=403, detail="Forbidden: Invalid password."
+            status_code=403, detail="Forbidden: Incorrect Delete Password."
         )
 
     download_r2_prefix(

@@ -2,10 +2,13 @@
   "status": "ok",
   "mode": "full_backfill",
   "start_date": "2000-01-01",
-  "end_date": "2026-05-07",
-  "tournaments_found": 270,
+  "end_date": "2026-05-27",
+  "tournaments_found": 272,
+  "tournament_ids_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/tournament_ids_full.csv",
+  "tournament_mapping_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/tournament_mapping.csv",
   "raw_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_raw.csv",
-  "recent_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_recent.csv",
+  "scraped_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_recent.csv",
+  "added_data_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/added_data.csv",
   "cleaned_matches_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/matches_cleaned.csv",
   "feature_csv": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
   "inference_state": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
@@ -15,21 +18,22 @@
     "mode": "train_full",
     "data_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
     "inference_state_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
-    "n_rows": 28750,
+    "n_rows": 57796,
     "sport_metrics": {
       "TT": {
-        "n_fit_rows": 28750
+        "n_fit_rows": 57796
       },
       "BD": {
-        "n_fit_rows": 28750
+        "n_fit_rows": 57796
       },
       "SQ": {
-        "n_fit_rows": 28750
+        "n_fit_rows": 57796
       },
       "TN": {
-        "n_fit_rows": 19658
+        "n_fit_rows": 39544
       }
     },
     "match_metrics": null
-  }
+  },
+  "note": "Pipeline updated files on disk. Restart FastAPI or clear server-side caches to load the new state/model."
 }

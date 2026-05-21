@@ -1,0 +1,1 @@
+mode,tournament_id,match_date,match_time,draw,draw_id,round,duration,location,team1_players,team2_players,team1_player_ids,team2_player_ids,team1_nationalities,team2_nationalities,team1_club_ids,team2_club_ids,winner_side,status_message,TT_p1,TT_p2,BD_p1,BD_p2,SQ_p1,SQ_p2,TN_p1,TN_p2,raw_points,h2h_url

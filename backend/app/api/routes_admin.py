@@ -108,6 +108,31 @@ def process_bulk_matches_background(payload: BulkMatchesCreate):
         traceback.print_exc()
 
 
+def process_delete_match_background(match_id: str):
+    try:
+        download_r2_prefix(
+            local_dir=settings.ml_data_dir,
+            prefix=settings.r2_prefix,
+        )
+
+        match_service.delete_match(match_id)
+
+        upload_directory_to_r2(
+            local_dir=settings.ml_data_dir,
+            prefix=settings.r2_prefix,
+        )
+
+        run_pipeline_background()
+
+        print(
+            {"status": "delete_match_background_complete", "match_id": match_id}
+        )
+
+    except Exception:
+        print("Delete match background job failed:")
+        traceback.print_exc()
+
+
 @router.post("/pipeline/run")
 def run_pipeline(
     background_tasks: BackgroundTasks,
@@ -224,6 +249,7 @@ def search_matches(
 @router.delete("/matches/{match_id}")
 def delete_match(
     match_id: str,
+    background_tasks: BackgroundTasks,
     x_admin_secret: str | None = Header(default=None),
     x_delete_password: str | None = Header(default=None),
 ):
@@ -254,19 +280,9 @@ def delete_match(
             status_code=403, detail="Forbidden: Incorrect Delete Password."
         )
 
-    download_r2_prefix(
-        local_dir=settings.ml_data_dir,
-        prefix=settings.r2_prefix,
-    )
-
-    match_service.delete_match(match_id)
-
-    upload_directory_to_r2(
-        local_dir=settings.ml_data_dir,
-        prefix=settings.r2_prefix,
-    )
+    background_tasks.add_task(process_delete_match_background, match_id)
 
     return {
-        "status": "ok",
-        "message": f"Match {match_id} successfully deleted.",
+        "status": "started",
+        "message": f"Match {match_id} deletion started in the background.",
     }

@@ -75,57 +75,72 @@ def ensure_dir(path):
 
 
 def augment_with_mirrored_rows(df: pd.DataFrame) -> pd.DataFrame:
-    mirrored = df.copy()
-
-    for a, b in [("p1_name", "p2_name"), ("p1_key", "p2_key")]:
-        if a in mirrored.columns and b in mirrored.columns:
-            mirrored[a], mirrored[b] = mirrored[b].copy(), mirrored[a].copy()
-
-    cols = list(mirrored.columns)
+    # Build mirrored rows via dictionary to avoid pandas highly fragmented DataFrame warnings
+    mirrored_dict = {}
+    cols = list(df.columns)
 
     for col in cols:
-        if "_p1" in col:
+        if col == "p1_name" and "p2_name" in cols:
+            mirrored_dict[col] = df["p2_name"]
+        elif col == "p2_name" and "p1_name" in cols:
+            mirrored_dict[col] = df["p1_name"]
+        elif col == "p1_key" and "p2_key" in cols:
+            mirrored_dict[col] = df["p2_key"]
+        elif col == "p2_key" and "p1_key" in cols:
+            mirrored_dict[col] = df["p1_key"]
+        elif "_p1" in col:
             other = col.replace("_p1", "_p2")
-            if other in mirrored.columns:
-                mirrored[col], mirrored[other] = (
-                    mirrored[other].copy(),
-                    mirrored[col].copy(),
-                )
+            if other in cols:
+                mirrored_dict[col] = df[other]
+            else:
+                mirrored_dict[col] = df[col]
+        elif "_p2" in col:
+            other = col.replace("_p2", "_p1")
+            if other in cols:
+                mirrored_dict[col] = df[other]
+            else:
+                mirrored_dict[col] = df[col]
+        else:
+            mirrored_dict[col] = df[col]
+
+    mirrored = pd.DataFrame(mirrored_dict)
 
     target_diff_cols = {f"{sport}_y_diff" for sport in SPORTS}
     target_diff_cols.add("y_total_diff")
 
-    for col in target_diff_cols:
-        if col in mirrored.columns:
-            mirrored[col] = -mirrored[col]
-
-    if "y_winner_p1" in mirrored.columns:
-        mirrored["y_winner_p1"] = 1 - mirrored["y_winner_p1"]
-
-    if "rating_winner_p1" in mirrored.columns:
-        mirrored["rating_winner_p1"] = 1 - mirrored["rating_winner_p1"]
-
+    negate_cols = []
     for col in mirrored.columns:
         if col in target_diff_cols:
-            continue
+            negate_cols.append(col)
+        else:
+            should_negate = (
+                col.endswith("_diff")
+                or col.endswith("_diff_p1_p2")
+                or col.endswith("_avg_diff_p1")
+            )
+            if should_negate and pd.api.types.is_numeric_dtype(mirrored[col]):
+                negate_cols.append(col)
 
-        should_negate = (
-            col.endswith("_diff")
-            or col.endswith("_diff_p1_p2")
-            or col.endswith("_avg_diff_p1")
-        )
+    if negate_cols:
+        mirrored[negate_cols] = -mirrored[negate_cols]
 
-        if should_negate and pd.api.types.is_numeric_dtype(mirrored[col]):
-            mirrored[col] = -mirrored[col]
+    for c in ["y_winner_p1", "rating_winner_p1"]:
+        if c in mirrored.columns:
+            mirrored[c] = 1 - mirrored[c]
 
-    for col in mirrored.columns:
-        if col.endswith("_winrate_p1") and pd.api.types.is_numeric_dtype(
-            mirrored[col]
-        ):
-            mirrored[col] = 1.0 - mirrored[col]
+    winrate_cols = [
+        c
+        for c in mirrored.columns
+        if c.endswith("_winrate_p1")
+        and pd.api.types.is_numeric_dtype(mirrored[c])
+    ]
+    if winrate_cols:
+        mirrored[winrate_cols] = 1.0 - mirrored[winrate_cols]
 
     df = df.copy()
     df["is_mirrored_row"] = 0
+
+    mirrored = mirrored.copy()
     mirrored["is_mirrored_row"] = 1
 
     out = pd.concat([df, mirrored], ignore_index=True)

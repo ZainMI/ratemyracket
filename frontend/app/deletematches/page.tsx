@@ -15,6 +15,7 @@ interface Match {
 export default function DeleteMatchesPage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [matches, setMatches] = useState<Match[]>([]);
+  const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function DeleteMatchesPage() {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setSelectedMatchIds([]);
 
     try {
       const API_URL =
@@ -42,7 +44,14 @@ export default function DeleteMatchesPage() {
         },
       );
 
-      if (!res.ok) throw new Error("Failed to fetch matches");
+      if (!res.ok) {
+        let errMessage = "Failed to fetch matches";
+        try {
+          const errData = await res.json();
+          if (errData.detail) errMessage = errData.detail;
+        } catch (e) {}
+        throw new Error(errMessage);
+      }
 
       const data = await res.json();
       setMatches(data);
@@ -56,36 +65,81 @@ export default function DeleteMatchesPage() {
     }
   };
 
-  const deleteMatch = async (matchId: string) => {
+  const toggleSelection = (id: string) => {
+    setSelectedMatchIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMatchIds.length === matches.length) {
+      setSelectedMatchIds([]);
+    } else {
+      setSelectedMatchIds(matches.map((m) => m.id));
+    }
+  };
+
+  const deleteMatches = async (ids: string[]) => {
     if (!deletePassword.trim()) {
       setError("Please enter the Delete Password first.");
       return;
     }
     if (
-      !window.confirm("Are you sure you want to permanently delete this match?")
+      !window.confirm(
+        `Are you sure you want to permanently delete ${ids.length} match(es)?`,
+      )
     ) {
       return;
     }
 
     setError(null);
     setSuccess(null);
+    setLoading(true);
 
     try {
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${API_URL}/admin/matches/${matchId}`, {
-        method: "DELETE",
-        headers: {
-          "x-delete-password": deletePassword,
-        },
-      });
+      let deletedCount = 0;
+      let failedCount = 0;
+      let lastError = "";
 
-      if (!res.ok) throw new Error("Failed to delete the match");
+      for (const matchId of ids) {
+        try {
+          const res = await fetch(`${API_URL}/admin/matches/${matchId}`, {
+            method: "DELETE",
+            headers: {
+              "x-delete-password": deletePassword,
+            },
+          });
 
-      setSuccess("Match deleted successfully.");
-      setMatches((prev) => prev.filter((m) => m.id !== matchId));
+          if (!res.ok) {
+            failedCount++;
+            try {
+              const errData = await res.json();
+              if (errData.detail) lastError = errData.detail;
+            } catch (e) {}
+          } else {
+            deletedCount++;
+          }
+        } catch (e) {
+          failedCount++;
+        }
+      }
+
+      if (failedCount > 0) {
+        setError(`Failed to delete ${failedCount} match(es). ${lastError}`);
+      }
+      if (deletedCount > 0) {
+        setSuccess(
+          `${deletedCount} match(es) deleted successfully! ML Pipeline started in the background.`,
+        );
+        setMatches((prev) => prev.filter((m) => !ids.includes(m.id)));
+        setSelectedMatchIds((prev) => prev.filter((id) => !ids.includes(id)));
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred while deleting.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -137,10 +191,35 @@ export default function DeleteMatchesPage() {
 
       {matches.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <span className="text-sm font-medium text-gray-700">
+              {matches.length} Matches Found
+            </span>
+            {selectedMatchIds.length > 0 && (
+              <button
+                onClick={() => deleteMatches(selectedMatchIds)}
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50"
+              >
+                Delete Selected ({selectedMatchIds.length})
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-600">
-              <thead className="bg-gray-50 text-gray-700 uppercase border-b border-gray-200">
+              <thead className="bg-gray-100 text-gray-700 uppercase border-b border-gray-200">
                 <tr>
+                  <th className="px-6 py-4 font-semibold w-12 text-center">
+                    <input
+                      type="checkbox"
+                      checked={
+                        matches.length > 0 &&
+                        selectedMatchIds.length === matches.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-6 py-4 font-semibold">Date</th>
                   <th className="px-6 py-4 font-semibold">Tournament</th>
                   <th className="px-6 py-4 font-semibold">Team 1</th>
@@ -152,8 +231,18 @@ export default function DeleteMatchesPage() {
                 {matches.map((match) => (
                   <tr
                     key={match.id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`hover:bg-gray-50 transition-colors ${
+                      selectedMatchIds.includes(match.id) ? "bg-blue-50" : ""
+                    }`}
                   >
+                    <td className="px-6 py-4 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedMatchIds.includes(match.id)}
+                        onChange={() => toggleSelection(match.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                       {match.match_date}
                     </td>
@@ -164,8 +253,9 @@ export default function DeleteMatchesPage() {
                     <td className="px-6 py-4">{match.team2_players}</td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => deleteMatch(match.id)}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                        onClick={() => deleteMatches([match.id])}
+                        disabled={loading}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors disabled:opacity-50"
                       >
                         Delete
                       </button>

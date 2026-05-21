@@ -217,12 +217,23 @@ def search_matches(player_name: str):
     if not matches_file.exists():
         return []
 
+    deleted_ids = set()
+    if DELETED_MATCHES_FILE.exists():
+        with DELETED_MATCHES_FILE.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                deleted_ids.add(row.get("match_id"))
+
     results = []
     player_name_lower = player_name.lower()
 
     with matches_file.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            match_id = get_match_hash(row)
+            if match_id in deleted_ids:
+                continue
+
             team1 = row.get("team1_players", "")
             team2 = row.get("team2_players", "")
             if (
@@ -231,7 +242,7 @@ def search_matches(player_name: str):
             ):
                 results.append(
                     {
-                        "id": get_match_hash(row),
+                        "id": match_id,
                         "match_date": row.get("match_date"),
                         "tournament_id": row.get("tournament_id"),
                         "team1_players": team1,

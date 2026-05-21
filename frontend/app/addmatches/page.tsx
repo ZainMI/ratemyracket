@@ -142,7 +142,7 @@ export default function BulkAddMatchesPage() {
 
       setStatus({
         type: "success",
-        message: `Successfully added ${data.matches_added} matches! ML Pipeline started in the background.`,
+        message: `Successfully added ${data.matches_added} matches! The changes will take effect after the next automated pipeline run.`,
       });
     } catch (err: any) {
       setStatus({

@@ -91,9 +91,6 @@ def process_bulk_matches_background(payload: BulkMatchesCreate):
             prefix=settings.r2_prefix,
         )
 
-        if added_count > 0:
-            run_pipeline_background()
-
         print(
             {
                 "status": "bulk_match_background_complete",
@@ -121,8 +118,6 @@ def process_delete_match_background(match_id: str):
             local_dir=settings.ml_data_dir,
             prefix=settings.r2_prefix,
         )
-
-        run_pipeline_background()
 
         print(
             {"status": "delete_match_background_complete", "match_id": match_id}

@@ -131,7 +131,7 @@ export default function DeleteMatchesPage() {
       }
       if (deletedCount > 0) {
         setSuccess(
-          `${deletedCount} match(es) deleted successfully! ML Pipeline started in the background.`,
+          `${deletedCount} match(es) deleted successfully! The changes will take effect after the next automated pipeline run.`,
         );
         setMatches((prev) => prev.filter((m) => !ids.includes(m.id)));
         setSelectedMatchIds((prev) => prev.filter((id) => !ids.includes(id)));

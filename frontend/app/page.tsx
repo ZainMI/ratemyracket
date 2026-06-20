@@ -123,14 +123,26 @@ export default function HomePage() {
             Used by players & organizations
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-10">
-            <Image
-              src="/usa_racketlon.png"
-              alt="USA Racketlon"
-              width={420}
-              height={160}
-              className="h-24 w-auto object-contain opacity-90 transition hover:opacity-100"
-            />
+          <div className="mt-6 flex flex-col items-center gap-8 sm:flex-row sm:justify-center sm:gap-12">
+            <div className="flex justify-center">
+              <Image
+                src="/usa_racketlon.png"
+                alt="USA Racketlon"
+                width={420}
+                height={160}
+                className="h-24 w-auto object-contain opacity-90 transition hover:opacity-100"
+              />
+            </div>
+
+            <div className="flex justify-center">
+              <Image
+                src="/uk_racketlon.png"
+                alt="UK Racketlon"
+                width={420}
+                height={160}
+                className="h-24 w-auto object-contain opacity-90 transition hover:opacity-100"
+              />
+            </div>
           </div>
         </div>
       </section>

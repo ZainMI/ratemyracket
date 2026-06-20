@@ -1,3 +1,14 @@
+# Environment files
 backend/.env
 frontend/.env.local
-.vscode
+
+# Python
+__pycache__/
+*.py[cod]
+
+# VS Code
+.vscode/*
+
+# Next.js
+frontend/node_modules/
+frontend/.next/

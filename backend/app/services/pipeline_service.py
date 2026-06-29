@@ -1,4 +1,3 @@
-import os
 import requests
 
 from ml.pipeline import run_pipeline
@@ -7,19 +6,28 @@ from app.services.r2_storage import upload_directory_to_r2, download_r2_prefix
 
 
 def notify_api_refresh():
-    # Call the refresh function directly instead of an HTTP request.
-    # This works reliably on Railway without needing API_PUBLIC_URL.
-    from app.api.routes_admin import refresh_data
+    api_url = settings.api_public_url.rstrip("/")
 
     try:
-        return refresh_data(x_admin_secret=settings.admin_secret_key)
+        res = requests.post(
+            f"{api_url}/admin/refresh-data",
+            headers={
+                "x-admin-secret": settings.admin_secret_key,
+            },
+            timeout=60,
+        )
+        res.raise_for_status()
+        return res.json()
+
     except Exception as e:
-        print(f"Failed to refresh API locally: {e}")
-        return {"status": "error", "reason": str(e)}
+        print(f"Failed to refresh API via HTTP: {e}")
+        return {
+            "status": "error",
+            "reason": str(e),
+        }
 
 
 def run_pipeline_background():
-    # 1. Sync latest data from R2 first to ensure added_data.csv is up to date
     download_result = download_r2_prefix(
         local_dir=settings.ml_data_dir,
         prefix=settings.r2_prefix,
@@ -30,18 +38,15 @@ def run_pipeline_background():
         full_backfill=False,
         retrain=True,
     )
-
     print("Pipeline finished:", result)
 
     upload_result = upload_directory_to_r2(
         local_dir=settings.ml_data_dir,
         prefix=settings.r2_prefix,
     )
-
     print("R2 upload finished:", upload_result)
 
     refresh_result = notify_api_refresh()
-
     print("API refresh finished:", refresh_result)
 
     return {

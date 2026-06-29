@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    api_public_url: str = "http://127.0.0.1:8000"
 
     frontend_url: str = "http://localhost:3000"
     frontend_urls: str = ""

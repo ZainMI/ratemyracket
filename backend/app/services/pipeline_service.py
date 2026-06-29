@@ -6,21 +6,20 @@ from app.services.r2_storage import upload_directory_to_r2, download_r2_prefix
 
 
 def notify_api_refresh():
-    api_url = settings.api_public_url.rstrip("/")
-
     try:
-        res = requests.post(
-            f"{api_url}/admin/refresh-data",
+        response = requests.post(
+            f"{settings.api_public_url.rstrip('/')}/admin/refresh-data",
             headers={
                 "x-admin-secret": settings.admin_secret_key,
             },
             timeout=60,
         )
-        res.raise_for_status()
-        return res.json()
+
+        response.raise_for_status()
+        return response.json()
 
     except Exception as e:
-        print(f"Failed to refresh API via HTTP: {e}")
+        print(f"Failed to refresh API: {e}")
         return {
             "status": "error",
             "reason": str(e),

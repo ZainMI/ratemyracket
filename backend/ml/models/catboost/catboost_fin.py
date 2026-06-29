@@ -75,7 +75,6 @@ def ensure_dir(path):
 
 
 def augment_with_mirrored_rows(df: pd.DataFrame) -> pd.DataFrame:
-    # Build mirrored rows via dictionary to avoid pandas highly fragmented DataFrame warnings
     mirrored_dict = {}
     cols = list(df.columns)
 
@@ -88,18 +87,16 @@ def augment_with_mirrored_rows(df: pd.DataFrame) -> pd.DataFrame:
             mirrored_dict[col] = df["p2_key"]
         elif col == "p2_key" and "p1_key" in cols:
             mirrored_dict[col] = df["p1_key"]
+        elif col == "p1_gender" and "p2_gender" in cols:
+            mirrored_dict[col] = df["p2_gender"]
+        elif col == "p2_gender" and "p1_gender" in cols:
+            mirrored_dict[col] = df["p1_gender"]
         elif "_p1" in col:
             other = col.replace("_p1", "_p2")
-            if other in cols:
-                mirrored_dict[col] = df[other]
-            else:
-                mirrored_dict[col] = df[col]
+            mirrored_dict[col] = df[other] if other in cols else df[col]
         elif "_p2" in col:
             other = col.replace("_p2", "_p1")
-            if other in cols:
-                mirrored_dict[col] = df[other]
-            else:
-                mirrored_dict[col] = df[col]
+            mirrored_dict[col] = df[other] if other in cols else df[col]
         else:
             mirrored_dict[col] = df[col]
 
@@ -155,12 +152,22 @@ def augment_with_mirrored_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 def read_data(path):
     df = pd.read_csv(path, low_memory=False)
+
     if "datetime" in df.columns:
         df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
         df = df.sort_values("datetime").reset_index(drop=True)
-    for col in ["p1_name", "p2_name", "p1_key", "p2_key"]:
+
+    for col in [
+        "p1_name",
+        "p2_name",
+        "p1_key",
+        "p2_key",
+        "p1_gender",
+        "p2_gender",
+    ]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.lower()
+
     df = augment_with_mirrored_rows(df)
     return df
 
@@ -397,6 +404,9 @@ def get_feature_columns(df):
 
 def get_base_feature_cols(df, sport):
     wanted = [
+        "p1_gender",
+        "p2_gender",
+        "same_gender",
         f"{sport}_rating_diff",
         f"{sport}_games_diff",
         f"{sport}_long_diff_mean_diff_p1_p2",
@@ -413,6 +423,9 @@ def get_base_feature_cols(df, sport):
 
 def get_residual_feature_cols(df, sport):
     wanted = [
+        "p1_gender",
+        "p2_gender",
+        "same_gender",
         f"{sport}_diff_mean_10_diff_p1_p2",
         f"{sport}_resid_mean_10_diff_p1_p2",
         f"{sport}_diff_std_10_diff_p1_p2",
@@ -425,6 +438,9 @@ def get_residual_feature_cols(df, sport):
 
 def get_total_feature_cols(df, sport):
     wanted = [
+        "p1_gender",
+        "p2_gender",
+        "same_gender",
         f"{sport}_rating_diff",
         f"{sport}_games_diff",
         f"{sport}_time_mult_diff",
@@ -466,6 +482,18 @@ def build_synthetic_match_row(
     s2 = player_states[player2_key]
 
     row = {}
+
+    p1_gender = s1.get("player_gender", s1.get("gender", "unknown"))
+    p2_gender = s2.get("player_gender", s2.get("gender", "unknown"))
+
+    row["p1_gender"] = str(p1_gender).strip().lower()
+    row["p2_gender"] = str(p2_gender).strip().lower()
+    row["same_gender"] = (
+        1
+        if row["p1_gender"] == row["p2_gender"]
+        and row["p1_gender"] != "unknown"
+        else 0
+    )
 
     row["h2h_games"] = 0.0
     row["h2h_avg_diff_p1"] = 0.0
@@ -878,18 +906,36 @@ def _train_single_sport_models(
     if len(rows) == 0:
         return None
 
-    X_base = df.loc[rows, base_feat_cols].copy().fillna(0.0)
-    X_resid = df.loc[rows, resid_feat_cols].copy().fillna(0.0)
-    X_total = df.loc[rows, total_feat_cols].copy().fillna(0.0)
+    X_base = df.loc[rows, base_feat_cols].copy()
+    X_resid = df.loc[rows, resid_feat_cols].copy()
+    X_total = df.loc[rows, total_feat_cols].copy()
+
+    for X in [X_base, X_resid, X_total]:
+        for col in ["p1_gender", "p2_gender"]:
+            if col in X.columns:
+                X[col] = X[col].astype(str).fillna("unknown")
+        numeric_cols = X.select_dtypes(include=[np.number]).columns
+        X[numeric_cols] = X[numeric_cols].fillna(0.0)
 
     y_diff = df.loc[rows, diff_col].astype(float).values
     y_total = df.loc[rows, total_col].astype(float).values
+
+    cat_features_base = [
+        c for c in ["p1_gender", "p2_gender"] if c in X_base.columns
+    ]
+    cat_features_resid = [
+        c for c in ["p1_gender", "p2_gender"] if c in X_resid.columns
+    ]
+    cat_features_total = [
+        c for c in ["p1_gender", "p2_gender"] if c in X_total.columns
+    ]
 
     model_diff_base = CatBoostRegressor(**BASE_DIFF_MODEL_PARAMS)
     model_diff_base.fit(
         X_base,
         y_diff,
         sample_weight=diff_weights(y_diff),
+        cat_features=cat_features_base,
     )
 
     base_pred = model_diff_base.predict(X_base)
@@ -904,6 +950,7 @@ def _train_single_sport_models(
         X_resid_aug,
         resid_train_target,
         sample_weight=residual_weights(y_diff, base_pred),
+        cat_features=cat_features_resid,
     )
 
     resid_pred = model_diff_resid.predict(X_resid_aug)
@@ -915,6 +962,7 @@ def _train_single_sport_models(
         X_total,
         y_total,
         sample_weight=total_weights(y_total),
+        cat_features=cat_features_total,
     )
 
     return {

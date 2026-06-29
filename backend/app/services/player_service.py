@@ -34,6 +34,11 @@ def clean_text_value(x) -> str:
     return str(x).strip()
 
 
+def clean_gender(x) -> str:
+    g = str(x).strip().lower()
+    return "female" if g == "female" else "male"
+
+
 def clean_score(x):
     if pd.isna(x):
         return None
@@ -96,6 +101,12 @@ def get_display_info(state: dict, player_key: str, record: dict):
                 record.get("player_country", record.get("country", "")),
             )
         ),
+        "gender": clean_gender(
+            display.get(
+                "gender",
+                record.get("player_gender", record.get("gender", "male")),
+            )
+        ),
     }
 
 
@@ -103,21 +114,26 @@ def get_display_info(state: dict, player_key: str, record: dict):
 # Display rating scale
 # -----------------------------
 def build_rating_scale(players: dict) -> dict:
-    scale = {}
+    scale = {
+        "male": {sport: [] for sport in SPORTS},
+        "female": {sport: [] for sport in SPORTS},
+    }
 
-    for sport in SPORTS:
-        vals = []
+    for record in players.values():
+        gender = clean_gender(
+            record.get("player_gender", record.get("gender", "male"))
+        )
 
-        for record in players.values():
+        for sport in SPORTS:
             games = int(float(record.get(f"{sport}_games_p1", 0)))
             raw = float(record.get(f"{sport}_rating_p1", 0.0))
 
             if games >= MIN_GAMES_FOR_RATING_SCALE:
-                vals.append(raw)
+                scale[gender][sport].append(raw)
 
-        vals = sorted(vals)
-
-        scale[sport] = vals
+    for gender in ["male", "female"]:
+        for sport in SPORTS:
+            scale[gender][sport] = sorted(scale[gender][sport])
 
     return scale
 
@@ -131,15 +147,20 @@ def get_rating_scale(players: dict) -> dict:
     return _rating_scale_cache
 
 
-def display_rating(raw_rating: float, sport: str, players: dict) -> int:
-    vals = get_rating_scale(players).get(sport, [])
+def display_rating(
+    raw_rating: float,
+    sport: str,
+    players: dict,
+    gender: str,
+) -> int:
+    gender = clean_gender(gender)
+    vals = get_rating_scale(players).get(gender, {}).get(sport, [])
 
     if len(vals) < 2:
         return 1200
 
     raw = float(raw_rating)
 
-    # percentile rank
     below = sum(v < raw for v in vals)
     equal = sum(v == raw for v in vals)
 
@@ -173,6 +194,7 @@ def search_players(q: str, limit: int = 20):
                     "player_key": player_key,
                     "player_name": name,
                     "country": country,
+                    "gender": info["gender"],
                 }
             )
 
@@ -196,6 +218,7 @@ def get_player(player_key: str):
         "player_key": player_key,
         "player_name": info["player_name"],
         "country": info["country"],
+        "gender": info["gender"],
     }
 
 
@@ -217,7 +240,12 @@ def get_player_ratings(player_key: str):
 
         ratings[sport] = {
             "raw_rating": raw,
-            "display_rating": display_rating(raw, sport, players),
+            "display_rating": display_rating(
+                raw_rating=raw,
+                sport=sport,
+                players=players,
+                gender=info["gender"],
+            ),
             "games": games,
         }
 
@@ -225,6 +253,7 @@ def get_player_ratings(player_key: str):
         "player_key": player_key,
         "player_name": info["player_name"],
         "country": info["country"],
+        "gender": info["gender"],
         "ratings": ratings,
     }
 
@@ -331,10 +360,7 @@ def get_player_matches(player_key: str, limit: int = 50):
         combined = (
             df["match_date"].astype(str).str.split(".").str[0] + " " + time_text
         )
-        df["sort_datetime"] = pd.to_datetime(
-            combined,
-            errors="coerce",
-        )
+        df["sort_datetime"] = pd.to_datetime(combined, errors="coerce")
         df["sort_datetime"] = df["sort_datetime"].fillna(df["datetime"])
     else:
         df["sort_datetime"] = df["datetime"]
@@ -451,11 +477,24 @@ def get_player_matches(player_key: str, limit: int = 50):
     return matches
 
 
-def get_leaderboard(sport: str = "overall", limit: int = 100):
+# -----------------------------
+# Leaderboard
+# -----------------------------
+def get_leaderboard(
+    sport: str = "overall",
+    limit: int = 100,
+    gender: str = "male",
+):
     sport_key = sport.upper() if sport.lower() != "overall" else "OVERALL"
 
-    if sport_key in _leaderboard_cache:
-        return _leaderboard_cache[sport_key][:limit]
+    gender_key = str(gender).strip().lower()
+    if gender_key not in ["male", "female"]:
+        gender_key = "male"
+
+    cache_key = f"{sport_key}:{gender_key}"
+
+    if cache_key in _leaderboard_cache:
+        return _leaderboard_cache[cache_key][:limit]
 
     state = load_inference_state()
     players = get_players_dict(state)
@@ -464,6 +503,10 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
 
     for player_key, record in players.items():
         info = get_display_info(state, player_key, record)
+        player_gender = info["gender"]
+
+        if player_gender != gender_key:
+            continue
 
         if sport_key in SPORTS:
             raw = float(record.get(f"{sport_key}_rating_p1", 0.0))
@@ -472,7 +515,12 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
             if games < MIN_GAMES_FOR_RATING_SCALE:
                 continue
 
-            rating = display_rating(raw, sport_key, players)
+            rating = display_rating(
+                raw_rating=raw,
+                sport=sport_key,
+                players=players,
+                gender=player_gender,
+            )
 
         else:
             sport_ratings = []
@@ -483,7 +531,14 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
                 raw_s = float(record.get(f"{s}_rating_p1", 0.0))
 
                 if games_s >= MIN_GAMES_FOR_RATING_SCALE:
-                    sport_ratings.append(display_rating(raw_s, s, players))
+                    sport_ratings.append(
+                        display_rating(
+                            raw_rating=raw_s,
+                            sport=s,
+                            players=players,
+                            gender=player_gender,
+                        )
+                    )
                     total_games += games_s
 
             if not sport_ratings:
@@ -498,6 +553,7 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
                 "player_key": player_key,
                 "player_name": info["player_name"],
                 "country": info["country"],
+                "gender": player_gender,
                 "rating": rating,
                 "games": games,
             }
@@ -508,7 +564,7 @@ def get_leaderboard(sport: str = "overall", limit: int = 100):
     for i, row in enumerate(rows, start=1):
         row["rank"] = i
 
-    _leaderboard_cache[sport_key] = rows
+    _leaderboard_cache[cache_key] = rows
 
     return rows[:limit]
 

@@ -598,7 +598,8 @@ def build_inference_state(
 
     for p_key, last_dt in latest_player_dt_by_key.items():
         p_info = player_info_by_key[p_key]
-        player_states_by_key[p_key] = build_final_player_state_record(
+
+        state = build_final_player_state_record(
             player_key=p_key,
             player_name=p_info["name"],
             country=p_info["country"],
@@ -607,6 +608,11 @@ def build_inference_state(
             recent_state=recent_state,
             long_term_state=long_term_state,
         )
+
+        state["gender"] = p_info.get("gender", "unknown")
+        state["player_gender"] = p_info.get("gender", "unknown")
+
+        player_states_by_key[p_key] = state
 
     pair_h2h = {}
     for pk, st in h2h_overall.items():
@@ -647,6 +653,36 @@ def build_training_data(
     df["datetime"] = safe_datetime(df)
     df = df.sort_values("datetime").reset_index(drop=True)
 
+    def majority_gender(counts):
+        male = counts.get("male", 0)
+        female = counts.get("female", 0)
+
+        if male > female:
+            return "male"
+        if female > male:
+            return "female"
+        return "unknown"
+
+    player_gender_counts = defaultdict(lambda: {"male": 0, "female": 0})
+
+    if "match_gender" in df.columns:
+        for _, row in df.iterrows():
+            match_gender = row.get("match_gender")
+
+            if match_gender not in {"male", "female"}:
+                continue
+
+            p1_key_tmp = player_key(row, 1)
+            p2_key_tmp = player_key(row, 2)
+
+            player_gender_counts[p1_key_tmp][match_gender] += 1
+            player_gender_counts[p2_key_tmp][match_gender] += 1
+
+    player_gender_by_key = {
+        key: majority_gender(counts)
+        for key, counts in player_gender_counts.items()
+    }
+
     elo = DecayedUpdateMarginElo()
 
     h2h_overall: Dict[Tuple[str, str], H2HStats] = defaultdict(H2HStats)
@@ -677,11 +713,22 @@ def build_training_data(
         p1_country = player_country(row, 1)
         p2_country = player_country(row, 2)
 
+        p1_gender = player_gender_by_key.get(p1_key, "unknown")
+        p2_gender = player_gender_by_key.get(p2_key, "unknown")
+
         latest_player_dt_by_key[p1_key] = dt
         latest_player_dt_by_key[p2_key] = dt
 
-        player_info_by_key[p1_key] = {"name": p1_name, "country": p1_country}
-        player_info_by_key[p2_key] = {"name": p2_name, "country": p2_country}
+        player_info_by_key[p1_key] = {
+            "name": p1_name,
+            "country": p1_country,
+            "gender": p1_gender,
+        }
+        player_info_by_key[p2_key] = {
+            "name": p2_name,
+            "country": p2_country,
+            "gender": p2_gender,
+        }
 
         out = {
             "match_index": i,
@@ -691,6 +738,11 @@ def build_training_data(
             "p2_key": p2_key,
             "p1_name": p1_name,
             "p2_name": p2_name,
+            "p1_gender": p1_gender,
+            "p2_gender": p2_gender,
+            "same_gender": (
+                1 if p1_gender == p2_gender and p1_gender != "unknown" else 0
+            ),
         }
 
         pred = elo.predict(p1_key, p2_key)
@@ -779,7 +831,6 @@ def build_training_data(
 
         out_rows.append(out)
 
-        # Update state AFTER row
         elo.update(p1_key, p2_key, diffs, dt)
 
         total_diff_for_h2h = 0.0
@@ -835,11 +886,14 @@ def build_training_data(
         "p2_name",
     ]
 
-    keep_feature_cols = []
+    keep_feature_cols = [
+        "p1_gender",
+        "p2_gender",
+        "same_gender",
+    ]
 
     for s in SPORTS:
         keep_feature_cols += [
-            # core rating features
             f"{s}_rating_p1",
             f"{s}_rating_p2",
             f"{s}_rating_diff",
@@ -851,12 +905,10 @@ def build_training_data(
             f"{s}_time_mult_p1",
             f"{s}_time_mult_p2",
             f"{s}_time_mult_diff",
-            # overall H2H in this sport
             f"{s}_h2h_games",
             f"{s}_h2h_avg_diff_p1",
             f"{s}_h2h_winrate_p1",
             f"{s}_h2h_days_since_last",
-            # recent-form features actually used
             f"{s}_p1_recent_diff_mean_10",
             f"{s}_p2_recent_diff_mean_10",
             f"{s}_diff_mean_10_diff_p1_p2",
@@ -869,7 +921,6 @@ def build_training_data(
             f"{s}_p1_recent_momentum_diff_5_20",
             f"{s}_p2_recent_momentum_diff_5_20",
             f"{s}_momentum_diff_5_20_diff_p1_p2",
-            # long-term shrunk features
             f"{s}_p1_long_n",
             f"{s}_p2_long_n",
             f"{s}_long_n_diff_p1_p2",
@@ -885,7 +936,6 @@ def build_training_data(
         ]
 
     keep_feature_cols += [
-        # overall match H2H
         "h2h_games",
         "h2h_avg_diff_p1",
         "h2h_winrate_p1",

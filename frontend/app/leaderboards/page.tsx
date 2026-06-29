@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getLeaderboard } from "@/lib/api";
 
+const GENDER_TABS = [
+  { key: "male", label: "Men" },
+  { key: "female", label: "Women" },
+];
+
 const TABS = [
   { key: "overall", label: "Overall" },
   { key: "TT", label: "Table Tennis" },
@@ -18,6 +23,7 @@ const DESKTOP_GRID =
   "sm:grid sm:grid-cols-[64px_minmax(0,1fr)_90px_110px_80px] sm:items-center sm:gap-4";
 
 export default function LeaderboardsPage() {
+  const [gender, setGender] = useState("male");
   const [sport, setSport] = useState("overall");
   const [rows, setRows] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -32,7 +38,7 @@ export default function LeaderboardsPage() {
       setPage(1);
       setPageInput(1);
 
-      const data = await getLeaderboard(sport, 10000);
+      const data = await getLeaderboard(sport, gender, 10000);
 
       if (!cancelled) {
         setRows(data);
@@ -45,7 +51,7 @@ export default function LeaderboardsPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport]);
+  }, [sport, gender]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
 
@@ -67,6 +73,9 @@ export default function LeaderboardsPage() {
     setSafePage(num);
   }
 
+  const activeSportLabel = TABS.find((t) => t.key === sport)?.label;
+  const activeGenderLabel = gender === "male" ? "Men" : "Women";
+
   return (
     <div className="space-y-6">
       <header className="animate-fade-in">
@@ -75,6 +84,24 @@ export default function LeaderboardsPage() {
           Explore the highest-rated players overall or by individual sport.
         </p>
       </header>
+
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-1.5 shadow-sm">
+        <div className="grid grid-cols-2 gap-2">
+          {GENDER_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setGender(tab.key)}
+              className={`rounded-xl px-3 py-2 text-sm font-bold transition-all duration-200 ${
+                gender === tab.key
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-1.5 shadow-sm">
         <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -95,7 +122,7 @@ export default function LeaderboardsPage() {
       </div>
 
       <section
-        key={sport}
+        key={`${gender}-${sport}`}
         className="glass-card animate-fade-in rounded-3xl p-4 sm:p-6"
       >
         {loading ? (
@@ -105,10 +132,10 @@ export default function LeaderboardsPage() {
             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm font-bold uppercase tracking-wide text-gray-500">
-                  {TABS.find((t) => t.key === sport)?.label}
+                  {activeGenderLabel} · {activeSportLabel}
                 </p>
                 <h2 className="text-xl font-black text-gray-950">
-                  Top Players
+                  Top {activeGenderLabel}
                 </h2>
               </div>
 
@@ -203,7 +230,6 @@ function LeaderboardRow({ row, index }: { row: any; index: number }) {
         animation: `fadeIn 0.25s ease-out ${index * 0.01}s both`,
       }}
     >
-      {/* Mobile layout */}
       <div className="sm:hidden">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -228,7 +254,6 @@ function LeaderboardRow({ row, index }: { row: any; index: number }) {
         </div>
       </div>
 
-      {/* Desktop layout */}
       <div className="hidden font-black text-gray-500 sm:block">
         #{row.rank}
       </div>

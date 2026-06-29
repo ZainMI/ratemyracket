@@ -1,6 +1,9 @@
 {
   "TT": {
     "base_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TT_rating_diff",
       "TT_games_diff",
       "TT_long_diff_mean_diff_p1_p2",
@@ -13,6 +16,9 @@
       "TT_h2h_winrate_p1"
     ],
     "resid_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TT_diff_mean_10_diff_p1_p2",
       "TT_resid_mean_10_diff_p1_p2",
       "TT_diff_std_10_diff_p1_p2",
@@ -21,6 +27,9 @@
       "TT_p2_recent_diff_std_10"
     ],
     "total_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TT_rating_diff",
       "TT_games_diff",
       "TT_time_mult_diff",
@@ -60,11 +69,17 @@
       "TT_time_mult_diff",
       "h2h_avg_diff_p1",
       "h2h_games",
-      "h2h_winrate_p1"
+      "h2h_winrate_p1",
+      "p1_gender",
+      "p2_gender",
+      "same_gender"
     ]
   },
   "BD": {
     "base_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "BD_rating_diff",
       "BD_games_diff",
       "BD_long_diff_mean_diff_p1_p2",
@@ -77,6 +92,9 @@
       "BD_h2h_winrate_p1"
     ],
     "resid_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "BD_diff_mean_10_diff_p1_p2",
       "BD_resid_mean_10_diff_p1_p2",
       "BD_diff_std_10_diff_p1_p2",
@@ -85,6 +103,9 @@
       "BD_p2_recent_diff_std_10"
     ],
     "total_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "BD_rating_diff",
       "BD_games_diff",
       "BD_time_mult_diff",
@@ -124,11 +145,17 @@
       "BD_time_mult_diff",
       "h2h_avg_diff_p1",
       "h2h_games",
-      "h2h_winrate_p1"
+      "h2h_winrate_p1",
+      "p1_gender",
+      "p2_gender",
+      "same_gender"
     ]
   },
   "SQ": {
     "base_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "SQ_rating_diff",
       "SQ_games_diff",
       "SQ_long_diff_mean_diff_p1_p2",
@@ -141,6 +168,9 @@
       "SQ_h2h_winrate_p1"
     ],
     "resid_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "SQ_diff_mean_10_diff_p1_p2",
       "SQ_resid_mean_10_diff_p1_p2",
       "SQ_diff_std_10_diff_p1_p2",
@@ -149,6 +179,9 @@
       "SQ_p2_recent_diff_std_10"
     ],
     "total_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "SQ_rating_diff",
       "SQ_games_diff",
       "SQ_time_mult_diff",
@@ -188,11 +221,17 @@
       "SQ_time_mult_diff",
       "h2h_avg_diff_p1",
       "h2h_games",
-      "h2h_winrate_p1"
+      "h2h_winrate_p1",
+      "p1_gender",
+      "p2_gender",
+      "same_gender"
     ]
   },
   "TN": {
     "base_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TN_rating_diff",
       "TN_games_diff",
       "TN_long_diff_mean_diff_p1_p2",
@@ -205,6 +244,9 @@
       "TN_h2h_winrate_p1"
     ],
     "resid_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TN_diff_mean_10_diff_p1_p2",
       "TN_resid_mean_10_diff_p1_p2",
       "TN_diff_std_10_diff_p1_p2",
@@ -213,6 +255,9 @@
       "TN_p2_recent_diff_std_10"
     ],
     "total_feat_cols": [
+      "p1_gender",
+      "p2_gender",
+      "same_gender",
       "TN_rating_diff",
       "TN_games_diff",
       "TN_time_mult_diff",
@@ -252,7 +297,10 @@
       "TN_time_mult_diff",
       "h2h_avg_diff_p1",
       "h2h_games",
-      "h2h_winrate_p1"
+      "h2h_winrate_p1",
+      "p1_gender",
+      "p2_gender",
+      "same_gender"
     ]
   }
 }

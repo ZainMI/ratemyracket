@@ -1199,9 +1199,21 @@ def train_full_and_package(
     return PredictorPackage.load(output_dir)
 
 
-# -------------------------------------------------
-# Example CLI usage
-# -------------------------------------------------
 if __name__ == "__main__":
     predictor = train_eval_and_package()
-    print("Saved evaluated package.")
+
+    print("\n========== RESULTS ==========")
+
+    match = predictor.metadata["match_metrics"]
+    print(f"Match MAE: {match['total_diff_mae']:.2f}")
+    print(f"Winner Accuracy: {match['winner_accuracy']:.2%}")
+
+    print("\nSport Results:")
+    for sport, m in predictor.metadata["sport_metrics"].items():
+        print(
+            f"{sport}: "
+            f"Diff MAE={m['diff_mae']:.2f} | "
+            f"Total MAE={m['total_mae']:.2f}"
+        )
+
+    print("\nPredictor package saved.")

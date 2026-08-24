@@ -28,8 +28,11 @@ import requests
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from urllib.parse import urlparse
 
-BASE = "https://fir.tournamentsoftware.com"
+FIR_BASE = "https://fir.tournamentsoftware.com"
+GLOBAL_BASE = "https://www.tournamentsoftware.com"
+BASE = FIR_BASE
 FIND_URL = f"{BASE}/find"
 DOSEARCH_URL = f"{BASE}/find/tournament/DoSearch"
 
@@ -69,13 +72,20 @@ def build_filters(
     start_date: str,
     end_date: str,
     postal_code: str = DEFAULT_POSTAL_CODE,
+    sport_id: str | int | None = None,
+    distance: str | int | None = None,
 ) -> dict:
-    return {
+    filters = {
         "StartDate": start_date,
         "EndDate": end_date,
         "DateFilterType": "0",
         "PostalCode": postal_code,
     }
+    if sport_id is not None:
+        filters["SportID"] = str(sport_id)
+    if distance is not None:
+        filters["Distance"] = str(distance)
+    return filters
 
 
 def make_session() -> requests.Session:
@@ -96,6 +106,18 @@ def make_session() -> requests.Session:
     session.mount("http://", adapter)
 
     return session
+
+
+def set_basic_cookie_consent(session: requests.Session, base_url: str) -> None:
+    """Avoid TournamentSoftware's cookie wall using basic cookies only."""
+    hostname = urlparse(base_url).hostname
+    if hostname:
+        session.cookies.set(
+            "st",
+            "l=1033&c=1&cp=1",
+            domain=hostname,
+            path="/",
+        )
 
 
 def extract_form_fields(html: str) -> dict:
@@ -245,6 +267,13 @@ def build_payload(base_form: dict, page: int, filters: dict) -> dict:
     payload["EndDate"] = filters["EndDate"]
     payload["PostalCode"] = filters["PostalCode"]
 
+    if "SportID" in filters:
+        payload["TournamentExtendedFilter.SportID"] = filters["SportID"]
+        payload["SportID"] = filters["SportID"]
+    if "Distance" in filters:
+        payload["TournamentFilter.Distance"] = filters["Distance"]
+        payload["Distance"] = filters["Distance"]
+
     payload.setdefault("TournamentFilter_Q", "")
     payload.setdefault("TournamentFilter.Q", "")
 
@@ -309,6 +338,9 @@ def fetch_tournament_records(
     empty_page_patience: int = DEFAULT_EMPTY_PAGE_PATIENCE,
     verbose: bool = True,
     mapping_csv: str | None = DEFAULT_MAPPING_CSV,
+    base_url: str = BASE,
+    sport_id: str | int | None = None,
+    distance: str | int | None = None,
 ) -> dict[str, dict]:
     """
     Fetch tournament records for a date range.
@@ -321,18 +353,29 @@ def fetch_tournament_records(
           }
         }
     """
-    filters = build_filters(start_date, end_date, postal_code)
+    filters = build_filters(
+        start_date,
+        end_date,
+        postal_code,
+        sport_id=sport_id,
+        distance=distance,
+    )
+
+    base_url = base_url.rstrip("/")
+    find_url = f"{base_url}/find"
+    dosearch_url = f"{base_url}/find/tournament/DoSearch"
 
     session = make_session()
+    set_basic_cookie_consent(session, base_url)
 
     if verbose:
-        print(f"GET {FIND_URL} start={start_date} end={end_date}")
+        print(f"GET {find_url} start={start_date} end={end_date}")
 
     session.headers.clear()
     session.headers.update(HEADERS_GET)
 
     response = session.get(
-        FIND_URL,
+        find_url,
         params={**filters, "page": 1},
         timeout=30,
     )
@@ -344,7 +387,13 @@ def fetch_tournament_records(
         print(f"Extracted {len(base_form)} form fields from /find")
 
     session.headers.clear()
-    session.headers.update(HEADERS_POST)
+    session.headers.update(
+        {
+            **HEADERS_POST,
+            "Origin": base_url,
+            "Referer": find_url,
+        }
+    )
 
     records: dict[str, dict] = {}
     empty_pages = 0
@@ -353,7 +402,7 @@ def fetch_tournament_records(
         payload = build_payload(base_form, page, filters)
 
         response = session.post(
-            DOSEARCH_URL,
+            dosearch_url,
             data=payload,
             timeout=30,
         )
@@ -407,6 +456,9 @@ def fetch_tournament_ids(
     empty_page_patience: int = DEFAULT_EMPTY_PAGE_PATIENCE,
     verbose: bool = True,
     mapping_csv: str | None = DEFAULT_MAPPING_CSV,
+    base_url: str = BASE,
+    sport_id: str | int | None = None,
+    distance: str | int | None = None,
 ) -> list[str]:
     """
     Backward-compatible function.
@@ -425,6 +477,9 @@ def fetch_tournament_ids(
         empty_page_patience=empty_page_patience,
         verbose=verbose,
         mapping_csv=mapping_csv,
+        base_url=base_url,
+        sport_id=sport_id,
+        distance=distance,
     )
 
     return sorted(records.keys())

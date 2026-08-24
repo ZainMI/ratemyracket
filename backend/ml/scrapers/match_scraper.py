@@ -36,7 +36,10 @@ from urllib.parse import urljoin, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
 
-BASE = "https://fir.tournamentsoftware.com"
+FIR_BASE = "https://fir.tournamentsoftware.com"
+GLOBAL_BASE = "https://www.tournamentsoftware.com"
+BASE = FIR_BASE
+TOURNAMENT_BASES = (FIR_BASE, GLOBAL_BASE)
 DEFAULT_IN_CSV = "data/tournament_ids.csv"
 DEFAULT_OUT_CSV = "data/matches.csv"
 DEFAULT_STATE_JSON = "data/scraper_state.json"
@@ -150,7 +153,9 @@ def safe_int(s: str) -> Optional[int]:
 # ---------------------------
 
 
-def discover_new_day_urls(base_html: str) -> List[Tuple[str, str]]:
+def discover_new_day_urls(
+    base_html: str, base_url: str = BASE
+) -> List[Tuple[str, str]]:
     """Return list of (url, YYYYMMDD) for /tournament/<guid>/matches/YYYYMMDD links."""
     soup = BeautifulSoup(base_html, "lxml")
     out = set()
@@ -158,13 +163,33 @@ def discover_new_day_urls(base_html: str) -> List[Tuple[str, str]]:
         href = a.get("href") or ""
         m = DAY_URL_RE_NEW.search(href)
         if m:
-            full = href if href.startswith("http") else (BASE + href)
+            full = href if href.startswith("http") else (base_url + href)
             out.add((full, m.group(2)))
+
+    # Single-day tournaments sometimes expose the active date only inside the
+    # matches initializer rather than as a navigation link.
+    if not out:
+        tournament_match = re.search(
+            r'"code"\s*:\s*"([0-9a-fA-F-]{36})"', base_html
+        )
+        dates = set(re.findall(r'"date"\s*:\s*"(\d{8})"', base_html))
+        if tournament_match:
+            tournament_id = tournament_match.group(1)
+            for day in dates:
+                out.add(
+                    (
+                        f"{base_url}/tournament/{tournament_id}/matches/{day}",
+                        day,
+                    )
+                )
     return sorted(out, key=lambda t: t[1])
 
 
 def parse_new_match_div(
-    match_div: BeautifulSoup, tournament_id: str, match_date: Optional[str]
+    match_div: BeautifulSoup,
+    tournament_id: str,
+    match_date: Optional[str],
+    base_url: str = BASE,
 ) -> dict:
     # time from nearest previous group header
     time_h5 = match_div.find_previous("h5", class_="match-group__header")
@@ -286,7 +311,7 @@ def parse_new_match_div(
     h2h = match_div.select_one("a.match__btn-h2h[href]")
     if h2h:
         href = h2h.get("href") or ""
-        h2h_url = href if href.startswith("http") else (BASE + href)
+        h2h_url = href if href.startswith("http") else (base_url + href)
 
     return {
         "mode": "new",
@@ -322,18 +347,20 @@ def parse_new_match_div(
 
 
 def scrape_new_mode(
-    session: requests.Session, tournament_id: str
+    session: requests.Session,
+    tournament_id: str,
+    base_url: str = BASE,
 ) -> List[dict]:
-    base_url = f"{BASE}/tournament/{tournament_id}/Matches"
-    base_html = fetch(session, base_url)
+    matches_url = f"{base_url}/tournament/{tournament_id}/Matches"
+    base_html = fetch(session, matches_url)
 
-    day_urls = discover_new_day_urls(base_html)
+    day_urls = discover_new_day_urls(base_html, base_url)
     targets: List[Tuple[str, Optional[str]]] = []
     if day_urls:
         targets = [(u, d) for (u, d) in day_urls]
     else:
         # sometimes matches are on base page
-        targets = [(base_url, None)]
+        targets = [(matches_url, None)]
 
     all_rows: List[dict] = []
     for url, day in targets:
@@ -343,7 +370,9 @@ def scrape_new_mode(
         if not match_divs:
             continue
         for md in match_divs:
-            all_rows.append(parse_new_match_div(md, tournament_id, day))
+            all_rows.append(
+                parse_new_match_div(md, tournament_id, day, base_url)
+            )
     return all_rows
 
 
@@ -353,14 +382,16 @@ def scrape_new_mode(
 
 
 def discover_legacy_day_urls(
-    session: requests.Session, tournament_id: str
+    session: requests.Session,
+    tournament_id: str,
+    base_url: str = BASE,
 ) -> List[Tuple[str, Optional[str]]]:
     """
     Legacy tournaments usually have a calendar on:
       /sport/tournament.aspx?id=<GUID>
     It links to legacymatches.aspx?id=<GUID>&d=YYYYMMDD and often an unscheduled link without d.
     """
-    url = f"{BASE}/sport/tournament.aspx?id={tournament_id}"
+    url = f"{base_url}/sport/tournament.aspx?id={tournament_id}"
     html = fetch(session, url)
     soup = BeautifulSoup(html, "lxml")
 
@@ -372,7 +403,7 @@ def discover_legacy_day_urls(
         if not LEGACY_DAY_RE.search(href):
             continue
 
-        full = href if href.startswith("http") else urljoin(BASE, href)
+        full = href if href.startswith("http") else urljoin(base_url, href)
         qs = parse_qs(urlparse(full).query)
         day = qs.get("d", [""])[0]
         day = day if (day.isdigit() and len(day) == 8) else None
@@ -559,9 +590,11 @@ def parse_legacy_table(
 
 
 def scrape_legacy_mode(
-    session: requests.Session, tournament_id: str
+    session: requests.Session,
+    tournament_id: str,
+    base_url: str = BASE,
 ) -> List[dict]:
-    day_urls = discover_legacy_day_urls(session, tournament_id)
+    day_urls = discover_legacy_day_urls(session, tournament_id, base_url)
     if not day_urls:
         return []
 
@@ -625,6 +658,19 @@ def fetch_matches_for_tournaments(
     ensure_csv_header(out_csv, fieldnames)
 
     with requests.Session() as session:
+        # TournamentSoftware otherwise serves a cookie-consent page instead of
+        # tournament HTML to a fresh server-side session. Basic cookies are
+        # sufficient; analytics/advertising consent is not needed.
+        for base_url in TOURNAMENT_BASES:
+            hostname = urlparse(base_url).hostname
+            if hostname:
+                session.cookies.set(
+                    "st",
+                    "l=1033&c=1&cp=1",
+                    domain=hostname,
+                    path="/",
+                )
+
         for idx, tid in enumerate(tournament_ids, 1):
             if state.get("done", {}).get(tid):
                 continue
@@ -635,39 +681,49 @@ def fetch_matches_for_tournaments(
             rows: List[dict] = []
             mode_used = ""
 
-            # 1) Try NEW mode first
-            try:
-                new_rows = scrape_new_mode(session, tid)
-            except Exception as e:
-                new_rows = []
-                if verbose:
-                    print(f"  ⚠️ new-mode error: {e}")
+            for tournament_base in TOURNAMENT_BASES:
+                host = urlparse(tournament_base).hostname or tournament_base
 
-            if new_rows:
-                rows = new_rows
-                mode_used = "new"
-                if verbose:
-                    print(f"  ✅ new-mode: {len(rows)} matches")
-            else:
-                # 2) Fall back to LEGACY mode
+                # 1) Try NEW mode first on this host.
                 try:
-                    legacy_rows = scrape_legacy_mode(session, tid)
+                    new_rows = scrape_new_mode(
+                        session, tid, tournament_base
+                    )
+                except Exception as e:
+                    new_rows = []
+                    if verbose:
+                        print(f"  ⚠️ {host} new-mode error: {e}")
+
+                if new_rows:
+                    rows = new_rows
+                    mode_used = f"new via {host}"
+                    if verbose:
+                        print(f"  ✅ {mode_used}: {len(rows)} matches")
+                    break
+
+                # 2) Fall back to LEGACY mode on this host.
+                try:
+                    legacy_rows = scrape_legacy_mode(
+                        session, tid, tournament_base
+                    )
                 except Exception as e:
                     legacy_rows = []
                     if verbose:
-                        print(f"  ⚠️ legacy-mode error: {e}")
+                        print(f"  ⚠️ {host} legacy-mode error: {e}")
 
                 if legacy_rows:
                     rows = legacy_rows
-                    mode_used = "legacy"
+                    mode_used = f"legacy via {host}"
                     if verbose:
-                        print(f"  ✅ legacy-mode: {len(rows)} matches")
-                else:
-                    if verbose:
-                        print("  ❌ no matches found in either mode (skipping)")
-                    state.setdefault("done", {})[tid] = True
-                    save_state(state, state_json)
-                    continue
+                        print(f"  ✅ {mode_used}: {len(rows)} matches")
+                    break
+
+            if not rows:
+                if verbose:
+                    print("  ❌ no matches found on either host (skipping)")
+                state.setdefault("done", {})[tid] = True
+                save_state(state, state_json)
+                continue
 
             append_rows(out_csv, fieldnames, rows)
 

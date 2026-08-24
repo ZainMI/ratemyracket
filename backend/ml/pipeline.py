@@ -17,7 +17,11 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.append(str(BASE_DIR))
 
-from scrapers.tournament_id_scraper import fetch_tournament_ids
+from scrapers.tournament_id_scraper import (
+    FIR_BASE,
+    GLOBAL_BASE,
+    fetch_tournament_ids,
+)
 from scrapers.match_scraper import fetch_matches_for_tournaments
 from data_clean import clean_matches
 from features import build_training_data
@@ -152,12 +156,52 @@ def run_pipeline(
 
     print(f"\n[1/6] Fetching tournaments from {start_date} to {end_date}...")
 
-    tournament_ids = fetch_tournament_ids(
-        start_date=start_date,
-        end_date=end_date,
-        verbose=False,
-        mapping_csv=str(tournament_mapping_csv),
-    )
+    tournament_sources = [
+        {
+            "name": "FIR",
+            "base_url": FIR_BASE,
+            "postal_code": "12211",
+            "sport_id": None,
+            "distance": None,
+        },
+        {
+            "name": "TournamentSoftware",
+            "base_url": GLOBAL_BASE,
+            "postal_code": "",
+            "sport_id": 12,
+            "distance": 15,
+        },
+    ]
+    ids_by_source: dict[str, int] = {}
+    tournament_ids: list[str] = []
+    source_errors: dict[str, str] = {}
+
+    for source in tournament_sources:
+        try:
+            source_ids = fetch_tournament_ids(
+                start_date=start_date,
+                end_date=end_date,
+                postal_code=source["postal_code"],
+                verbose=False,
+                mapping_csv=str(tournament_mapping_csv),
+                base_url=source["base_url"],
+                sport_id=source["sport_id"],
+                distance=source["distance"],
+            )
+            ids_by_source[source["name"]] = len(source_ids)
+            tournament_ids.extend(source_ids)
+            print(f"  {source['name']}: {len(source_ids)} tournaments")
+        except Exception as exc:
+            source_errors[source["name"]] = str(exc)
+            print(f"  Warning: {source['name']} discovery failed: {exc}")
+
+    if len(source_errors) == len(tournament_sources):
+        raise RuntimeError(
+            "Tournament discovery failed for every configured source: "
+            + "; ".join(
+                f"{name}: {error}" for name, error in source_errors.items()
+            )
+        )
 
     tournament_ids = sorted(set(tournament_ids))
 
@@ -279,6 +323,8 @@ def run_pipeline(
         "start_date": start_date,
         "end_date": end_date,
         "tournaments_found": len(tournament_ids),
+        "tournaments_by_source": ids_by_source,
+        "tournament_source_errors": source_errors,
         "tournament_ids_csv": str(tournament_ids_csv),
         "tournament_mapping_csv": str(tournament_mapping_csv),
         "raw_matches_csv": str(raw_matches_csv),

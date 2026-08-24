@@ -148,24 +148,7 @@ def guess_tournament_name(tag) -> str:
                 title_link.get_text(" ", strip=True)
             )
             if title:
-                location = ""
-                subheading = card.select_one(".media__subheading")
-                if subheading:
-                    subheading_text = clean_text(
-                        subheading.get_text(" ", strip=True)
-                    )
-                    if "|" in subheading_text:
-                        location = clean_text(
-                            subheading_text.split("|", 1)[1]
-                        )
-                        location = re.sub(
-                            r"\s*\([\d,]+\s+miles?\)\s*$",
-                            "",
-                            location,
-                            flags=re.IGNORECASE,
-                        ).strip()
-
-                return f"{title} — {location}" if location else title
+                return title
 
     title = clean_text(tag.get("title", ""))
     if title:

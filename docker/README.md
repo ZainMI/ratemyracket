@@ -14,9 +14,10 @@ container. The host scheduler starts it at 2:00 AM, and the runner:
 
 ## Prerequisites
 
-Install Git, Docker Engine, the Docker Compose plugin, and `flock` on the home
-server. Clone this repository into a dedicated deployment directory. A private
-repository needs a GitHub deploy key or other non-interactive Git credential.
+Install Git, Docker Engine, the Docker Compose plugin, `flock`, and Python 3 on
+the home server. Clone this repository into a dedicated deployment directory.
+A private repository needs a GitHub deploy key or other non-interactive Git
+credential.
 
 ## Configure
 
@@ -29,6 +30,21 @@ chmod 600 docker/.env.worker
 
 Edit `docker/.env.worker` with the same R2 and API credentials used by the
 current Railway worker. The real file is ignored by Git.
+
+For failure email, also set:
+
+```env
+MAIL_TO=zainmagdon@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USERNAME=zainmagdon@gmail.com
+SMTP_PASSWORD=your-google-app-password
+SMTP_FROM=zainmagdon@gmail.com
+```
+
+Gmail requires a Google app password for SMTP; do not put your regular Google
+password in this file. App passwords require 2-Step Verification on the Google
+account. Keep `.env.worker` restricted with `chmod 600`.
 
 Make the runner executable:
 
@@ -62,13 +78,41 @@ crontab -e
 Add the following, replacing the repository path:
 
 ```cron
-0 2 * * * /absolute/path/to/RacketRating/docker/run-pipeline.sh >> /absolute/path/to/RacketRating/docker/pipeline.log 2>&1
+0 2 * * * /absolute/path/to/RacketRating/docker/run-pipeline.sh >/dev/null 2>&1
 ```
 
 Cron uses the home server's timezone. Check it with:
 
 ```bash
 timedatectl
+```
+
+## Logs and failure email
+
+Every run writes a timestamped log under `docker/logs/`, including failures
+during Git pull, image build, and container execution. Logs are retained for 30
+days by default.
+
+```bash
+ls -lt docker/logs/
+tail -f docker/logs/latest.log
+```
+
+Override retention in the cron command if needed:
+
+```cron
+PIPELINE_LOG_RETENTION_DAYS=60
+```
+
+On failure, the runner emails the configured recipient with the exit code, log
+path, and final 200 log lines. To test email without waiting for a real pipeline
+failure:
+
+```bash
+python3 docker/send_failure_email.py \
+  --env-file docker/.env.worker \
+  --log-file docker/logs/latest.log \
+  --exit-code 1
 ```
 
 ## Useful commands

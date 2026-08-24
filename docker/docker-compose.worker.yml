@@ -1,0 +1,8 @@
+services:
+  pipeline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    env_file:
+      - .env.worker
+    restart: "no"

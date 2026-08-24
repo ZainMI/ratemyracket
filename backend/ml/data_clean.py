@@ -106,7 +106,40 @@ def correct_player(name, country, corrections):
         return name, country
 
     canonical_name, canonical_country = correction
-    return canonical_name or name, canonical_country or country
+    corrected_name = canonical_name or name
+    corrected_country = canonical_country or country
+
+    # A name-specific alias may leave the country unchanged. Apply any global
+    # country normalization (for example ENG -> GBR) after resolving the name.
+    country_correction = corrections.get(("", corrected_country))
+    if country_correction:
+        global_name, global_country = country_correction
+        corrected_name = global_name or corrected_name
+        corrected_country = global_country or corrected_country
+
+    return corrected_name, corrected_country
+
+
+def build_player_country_lookup(input_csv, corrections):
+    """Find the unambiguous known countries for each canonical player name."""
+    countries_by_name = {}
+
+    with open(input_csv, newline="", encoding="utf-8") as infile:
+        for row in csv.DictReader(infile):
+            for side in (1, 2):
+                name, country = correct_player(
+                    row.get(f"team{side}_players"),
+                    row.get(f"team{side}_nationalities"),
+                    corrections,
+                )
+                if name and country:
+                    countries_by_name.setdefault(name, set()).add(country)
+
+    return {
+        name: next(iter(countries))
+        for name, countries in countries_by_name.items()
+        if len(countries) == 1
+    }
 
 
 def infer_match_gender_from_draw(draw_name):
@@ -130,6 +163,8 @@ def clean_matches(
     corrections_csv=DEFAULT_PLAYER_CORRECTIONS,
 ):
     corrections = load_player_corrections(corrections_csv)
+    country_lookup = build_player_country_lookup(input_csv, corrections)
+    inferred_countries = 0
 
     with open(input_csv, newline="", encoding="utf-8") as infile:
         reader = csv.DictReader(infile)
@@ -192,6 +227,9 @@ def clean_matches(
                         row.get(country_field),
                         corrections,
                     )
+                    if not country and player in country_lookup:
+                        country = country_lookup[player]
+                        inferred_countries += 1
                     row[player_field] = player
                     row[country_field] = country
 
@@ -213,6 +251,10 @@ def clean_matches(
 
     print(f"Saved cleaned file to {output_csv}")
     print(f"Applied {len(corrections)} player correction rules.")
+    print(
+        f"Filled {inferred_countries} missing countries from "
+        "unambiguous player-name matches."
+    )
     print(f"Kept: {kept} rows | Removed: {removed} rows")
 
 

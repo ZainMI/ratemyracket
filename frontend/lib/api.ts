@@ -60,6 +60,29 @@ export async function getPlayerMatches(playerKey: string) {
   return Array.isArray(data) ? data : [];
 }
 
+export async function getHeadToHeadMatches(
+  player1Key: string,
+  player2Key: string,
+  limit = 20,
+) {
+  const params = new URLSearchParams({
+    opponent_key: player2Key,
+    limit: String(limit),
+  });
+  const res = await fetch(
+    `${API}/players/${encodeURIComponent(player1Key)}/matches?${params}`,
+  );
+
+  const data = await res.json().catch(() => []);
+
+  if (!res.ok) {
+    console.error("Failed to load head-to-head matches:", data);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getLeaderboard(
   sport: string = "overall",
   gender: string = "male",

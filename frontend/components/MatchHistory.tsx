@@ -25,12 +25,20 @@ function Check({ show }: { show: boolean }) {
   return <span className="ml-1 text-emerald-600">✓</span>;
 }
 
-export default function MatchHistory({ matches }: { matches: any[] }) {
+export default function MatchHistory({
+  matches,
+  title = "Match History",
+  emptyMessage = "No matches found.",
+}: {
+  matches: any[];
+  title?: string;
+  emptyMessage?: string;
+}) {
   if (!matches || matches.length === 0) {
     return (
       <section className="glass-card rounded-3xl p-4 sm:p-6">
-        <h3 className="text-xl font-bold text-gray-950">Match History</h3>
-        <p className="mt-2 text-gray-600">No matches found.</p>
+        <h3 className="text-xl font-bold text-gray-950">{title}</h3>
+        <p className="mt-2 text-gray-600">{emptyMessage}</p>
       </section>
     );
   }
@@ -43,7 +51,7 @@ export default function MatchHistory({ matches }: { matches: any[] }) {
 
   return (
     <section className="glass-card rounded-3xl p-4 sm:p-6">
-      <h3 className="mb-4 text-xl font-black text-gray-950">Match History</h3>
+      <h3 className="mb-4 text-xl font-black text-gray-950">{title}</h3>
 
       <div className="space-y-3">
         {sortedMatches.map((m, i) => {

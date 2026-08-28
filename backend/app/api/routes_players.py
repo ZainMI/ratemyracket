@@ -38,8 +38,16 @@ def ratings(player_key: str):
 
 
 @router.get("/{player_key}/matches")
-def matches(player_key: str, limit: int = 50):
-    return get_player_matches(player_key, limit=limit)
+def matches(
+    player_key: str,
+    limit: int = 50,
+    opponent_key: str | None = None,
+):
+    return get_player_matches(
+        player_key,
+        limit=limit,
+        opponent_player_key=opponent_key,
+    )
 
 
 @router.get("/{player_key}")

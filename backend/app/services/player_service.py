@@ -339,7 +339,11 @@ def total_score(scores: dict, side_index: int) -> int:
 # -----------------------------
 # Match history
 # -----------------------------
-def get_player_matches(player_key: str, limit: int = 50):
+def get_player_matches(
+    player_key: str,
+    limit: int = 50,
+    opponent_player_key: str | None = None,
+):
     if not MATCHES_PATH.exists():
         return []
 
@@ -383,6 +387,13 @@ def get_player_matches(player_key: str, limit: int = 50):
             continue
 
         player_is_p1 = player_key == p1_key
+        row_opponent_key = p2_key if player_is_p1 else p1_key
+
+        if (
+            opponent_player_key
+            and row_opponent_key != opponent_player_key
+        ):
+            continue
 
         player_name = (
             row.get("team1_players")
@@ -395,7 +406,7 @@ def get_player_matches(player_key: str, limit: int = 50):
             else row.get("team2_nationalities")
         )
 
-        opponent_key = p2_key if player_is_p1 else p1_key
+        opponent_key = row_opponent_key
         opponent_name = (
             row.get("team2_players")
             if player_is_p1

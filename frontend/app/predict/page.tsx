@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import PlayerSearch from "@/components/PlayerSearch";
 import PredictionResult from "@/components/PredictionResult";
 import CompactRatings from "@/components/CompactRatings";
-import { predictMatch, getPlayerRatings } from "@/lib/api";
+import MatchHistory from "@/components/MatchHistory";
+import {
+  predictMatch,
+  getPlayerRatings,
+  getHeadToHeadMatches,
+} from "@/lib/api";
 import type { Player, Prediction } from "@/lib/types";
 
 export default function PredictPage() {
@@ -16,18 +21,28 @@ export default function PredictPage() {
   const [showRatings, setShowRatings] = useState(false);
 
   const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [headToHeadMatches, setHeadToHeadMatches] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
+  const [loadingHeadToHead, setLoadingHeadToHead] = useState(false);
   const [error, setError] = useState("");
 
   async function selectP1(player: Player) {
     setP1(player);
     setPrediction(null);
+    setHeadToHeadMatches([]);
+    setLoadingPrediction(false);
+    setLoadingHeadToHead(false);
     setP1Ratings(await getPlayerRatings(player.player_key));
   }
 
   async function selectP2(player: Player) {
     setP2(player);
     setPrediction(null);
+    setHeadToHeadMatches([]);
+    setLoadingPrediction(false);
+    setLoadingHeadToHead(false);
     setP2Ratings(await getPlayerRatings(player.player_key));
   }
 
@@ -39,17 +54,31 @@ export default function PredictPage() {
 
     async function runPrediction() {
       setLoadingPrediction(true);
+      setLoadingHeadToHead(true);
       setError("");
       setPrediction(null);
+      setHeadToHeadMatches([]);
 
-      try {
-        const data = await predictMatch(p1!.player_key, p2!.player_key);
-        if (!cancelled) setPrediction(data);
-      } catch (e: any) {
-        if (!cancelled) setError(e.message || "Prediction failed");
-      } finally {
-        if (!cancelled) setLoadingPrediction(false);
+      const [predictionResult, headToHeadResult] = await Promise.allSettled([
+        predictMatch(p1!.player_key, p2!.player_key),
+        getHeadToHeadMatches(p1!.player_key, p2!.player_key),
+      ]);
+
+      if (cancelled) return;
+
+      if (predictionResult.status === "fulfilled") {
+        setPrediction(predictionResult.value);
+      } else {
+        const reason = predictionResult.reason;
+        setError(reason?.message || "Prediction failed");
       }
+
+      if (headToHeadResult.status === "fulfilled") {
+        setHeadToHeadMatches(headToHeadResult.value);
+      }
+
+      setLoadingPrediction(false);
+      setLoadingHeadToHead(false);
     }
 
     runPrediction();
@@ -115,6 +144,21 @@ export default function PredictPage() {
       {error && <p className="text-red-600">{error}</p>}
 
       <PredictionResult prediction={prediction} />
+
+      {p1 && p2 && p1.player_key !== p2.player_key && (
+        loadingHeadToHead ? (
+          <section className="glass-card rounded-3xl p-4 sm:p-6">
+            <div className="h-6 w-64 animate-pulse rounded bg-slate-200" />
+            <div className="mt-4 h-32 animate-pulse rounded-2xl bg-slate-100" />
+          </section>
+        ) : (
+          <MatchHistory
+            matches={headToHeadMatches}
+            title="Past Head-to-Head Matches"
+            emptyMessage="These players have no recorded matches against each other."
+          />
+        )
+      )}
     </div>
   );
 }

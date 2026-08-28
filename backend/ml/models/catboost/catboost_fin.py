@@ -28,6 +28,8 @@ ALPHAS = {
     "SQ": 0.060,
     "TN": 0.040,
 }
+TIME_C = {"TT": 0.6, "BD": 0.7, "SQ": 0.6, "TN": 0.5}
+TIME_TAU_DAYS = {"TT": 90.0, "BD": 120.0, "SQ": 90.0, "TN": 120.0}
 
 BASE_DIFF_MODEL_PARAMS = dict(
     iterations=900,
@@ -63,6 +65,7 @@ TOTAL_MODEL_PARAMS = dict(
 )
 
 RESIDUAL_SCALE = 0.70
+OOF_FOLDS = 3
 
 
 # -------------------------------------------------
@@ -182,6 +185,19 @@ def load_inference_state(path):
 # -------------------------------------------------
 def rating_to_score_diff(x: float, alpha: float) -> float:
     return MAX_DIFF_PER_SPORT * np.tanh((alpha * x) / 2.0)
+
+
+def elapsed_days(value) -> float:
+    dt = pd.to_datetime(value, errors="coerce", utc=True)
+    if pd.isna(dt):
+        return 0.0
+    return float(max(0, (pd.Timestamp.now(tz="UTC") - dt).days))
+
+
+def inference_time_multiplier(sport: str, gap_days: float) -> float:
+    return 1.0 + TIME_C[sport] * (
+        1.0 - np.exp(-gap_days / TIME_TAU_DAYS[sport])
+    )
 
 
 def reconstruct_scores(pred_diff, pred_total):
@@ -408,7 +424,13 @@ def get_base_feature_cols(df, sport):
         "p2_gender",
         "same_gender",
         f"{sport}_rating_diff",
+        "overall_rating_diff",
+        "rating_balance_diff",
         f"{sport}_games_diff",
+        f"{sport}_games_p1",
+        f"{sport}_games_p2",
+        f"{sport}_days_since_last_p1",
+        f"{sport}_days_since_last_p2",
         f"{sport}_long_diff_mean_diff_p1_p2",
         f"{sport}_long_winrate_diff_p1_p2",
         "h2h_games",
@@ -432,6 +454,12 @@ def get_residual_feature_cols(df, sport):
         f"{sport}_momentum_diff_5_20_diff_p1_p2",
         f"{sport}_p1_recent_diff_std_10",
         f"{sport}_p2_recent_diff_std_10",
+        f"{sport}_p1_recent_recent_n_10",
+        f"{sport}_p2_recent_recent_n_10",
+        f"{sport}_p1_recent_days_since_last_match",
+        f"{sport}_p2_recent_days_since_last_match",
+        f"{sport}_p1_recent_ewm_diff",
+        f"{sport}_p2_recent_ewm_diff",
     ]
     return [c for c in wanted if c in df.columns]
 
@@ -442,7 +470,13 @@ def get_total_feature_cols(df, sport):
         "p2_gender",
         "same_gender",
         f"{sport}_rating_diff",
+        "overall_rating_diff",
+        "rating_balance_diff",
         f"{sport}_games_diff",
+        f"{sport}_games_p1",
+        f"{sport}_games_p2",
+        f"{sport}_days_since_last_p1",
+        f"{sport}_days_since_last_p2",
         f"{sport}_time_mult_diff",
         "h2h_games",
         "h2h_avg_diff_p1",
@@ -459,6 +493,8 @@ def get_total_feature_cols(df, sport):
         f"{sport}_long_winrate_diff_p1_p2",
         f"{sport}_p1_long_n",
         f"{sport}_p2_long_n",
+        f"{sport}_p1_recent_recent_n_10",
+        f"{sport}_p2_recent_recent_n_10",
     ]
     return [c for c in wanted if c in df.columns]
 
@@ -480,6 +516,8 @@ def build_synthetic_match_row(
 
     s1 = player_states[player1_key]
     s2 = player_states[player2_key]
+    elapsed1 = elapsed_days(s1.get("last_datetime"))
+    elapsed2 = elapsed_days(s2.get("last_datetime"))
 
     row = {}
 
@@ -513,9 +551,7 @@ def build_synthetic_match_row(
         b_key = pair_h2h["b_name"]
 
         row["h2h_games"] = overall["h2h_games"]
-        row["h2h_days_since_last"] = float(
-            overall.get("h2h_days_since_last", 9999.0)
-        )
+        row["h2h_days_since_last"] = elapsed_days(pair_h2h.get("last_dt"))
 
         if player1_key == a_key and player2_key == b_key:
             row["h2h_avg_diff_p1"] = overall["h2h_avg_diff_p1"]
@@ -540,18 +576,12 @@ def build_synthetic_match_row(
         row[f"{sport}_games_p2"] = g2
         row[f"{sport}_games_diff"] = g1 - g2
 
-        row[f"{sport}_days_since_last_p1"] = float(
-            s1.get(f"{sport}_days_since_last_p1", 0.0)
-        )
-        row[f"{sport}_days_since_last_p2"] = float(
-            s2.get(f"{sport}_days_since_last_p1", 0.0)
-        )
-        row[f"{sport}_time_mult_p1"] = float(
-            s1.get(f"{sport}_time_mult_p1", 1.0)
-        )
-        row[f"{sport}_time_mult_p2"] = float(
-            s2.get(f"{sport}_time_mult_p1", 1.0)
-        )
+        gap1 = float(s1.get(f"{sport}_days_since_last_p1", 0.0)) + elapsed1
+        gap2 = float(s2.get(f"{sport}_days_since_last_p1", 0.0)) + elapsed2
+        row[f"{sport}_days_since_last_p1"] = gap1
+        row[f"{sport}_days_since_last_p2"] = gap2
+        row[f"{sport}_time_mult_p1"] = inference_time_multiplier(sport, gap1)
+        row[f"{sport}_time_mult_p2"] = inference_time_multiplier(sport, gap2)
         row[f"{sport}_time_mult_diff"] = (
             row[f"{sport}_time_mult_p1"] - row[f"{sport}_time_mult_p2"]
         )
@@ -567,9 +597,8 @@ def build_synthetic_match_row(
             b_key = pair_h2h["b_name"]
 
             row[f"{sport}_h2h_games"] = sport_h[f"{sport}_h2h_games"]
-            row[f"{sport}_h2h_days_since_last"] = float(
-                sport_h.get(f"{sport}_h2h_days_since_last", 9999.0)
-            )
+            sport_last_dt = pair_h2h.get("sport_last_dt", {}).get(sport)
+            row[f"{sport}_h2h_days_since_last"] = elapsed_days(sport_last_dt)
 
             if player1_key == a_key and player2_key == b_key:
                 row[f"{sport}_h2h_avg_diff_p1"] = sport_h[
@@ -592,12 +621,18 @@ def build_synthetic_match_row(
             "blowout_win_rate_10",
             "diff_std_10",
             "momentum_diff_5_20",
+            "recent_n_10",
+            "days_since_last_match",
+            "ewm_diff",
         ]
         for suffix in recent_suffixes:
             p1_col = f"{sport}_p1_recent_{suffix}"
             p2_col = f"{sport}_p2_recent_{suffix}"
             row[p1_col] = float(s1.get(p1_col, 0.0))
             row[p2_col] = float(s2.get(p2_col, 0.0))
+            if suffix == "days_since_last_match":
+                row[p1_col] += elapsed1
+                row[p2_col] += elapsed2
             row[f"{sport}_{suffix}_diff_p1_p2"] = row[p1_col] - row[p2_col]
 
         long_suffixes = [
@@ -612,6 +647,19 @@ def build_synthetic_match_row(
             row[p1_col] = float(s1.get(p1_col, 0.0))
             row[p2_col] = float(s2.get(p2_col, 0.0))
             row[f"{sport}_{suffix}_diff_p1_p2"] = row[p1_col] - row[p2_col]
+
+    p1_ratings = [row[f"{sport}_rating_p1"] for sport in SPORTS]
+    p2_ratings = [row[f"{sport}_rating_p2"] for sport in SPORTS]
+    row["overall_rating_p1"] = float(np.mean(p1_ratings))
+    row["overall_rating_p2"] = float(np.mean(p2_ratings))
+    row["overall_rating_diff"] = (
+        row["overall_rating_p1"] - row["overall_rating_p2"]
+    )
+    row["rating_balance_p1"] = float(np.std(p1_ratings))
+    row["rating_balance_p2"] = float(np.std(p2_ratings))
+    row["rating_balance_diff"] = (
+        row["rating_balance_p1"] - row["rating_balance_p2"]
+    )
 
     return pd.Series({col: row.get(col, 0.0) for col in feature_cols})
 
@@ -930,6 +978,30 @@ def _train_single_sport_models(
         c for c in ["p1_gender", "p2_gender"] if c in X_total.columns
     ]
 
+    # Generate chronological out-of-fold base predictions. The residual model
+    # and calibrator must not learn from a base model's in-sample predictions.
+    oof_pred = np.full(len(rows), np.nan, dtype=float)
+    boundaries = np.linspace(0.4, 1.0, OOF_FOLDS + 1)
+    for fold in range(OOF_FOLDS):
+        train_end = int(len(rows) * boundaries[fold])
+        valid_end = int(len(rows) * boundaries[fold + 1])
+        if train_end < 20 or valid_end <= train_end:
+            continue
+        fold_model = CatBoostRegressor(**BASE_DIFF_MODEL_PARAMS)
+        fold_model.fit(
+            X_base.iloc[:train_end],
+            y_diff[:train_end],
+            sample_weight=diff_weights(y_diff[:train_end]),
+            cat_features=cat_features_base,
+        )
+        oof_pred[train_end:valid_end] = fold_model.predict(
+            X_base.iloc[train_end:valid_end]
+        )
+
+    stack_mask = np.isfinite(oof_pred)
+    if stack_mask.sum() < 20:
+        raise ValueError(f"Not enough OOF rows to train {sport} residual model")
+
     model_diff_base = CatBoostRegressor(**BASE_DIFF_MODEL_PARAMS)
     model_diff_base.fit(
         X_base,
@@ -938,24 +1010,25 @@ def _train_single_sport_models(
         cat_features=cat_features_base,
     )
 
-    base_pred = model_diff_base.predict(X_base)
-    resid_train_target = y_diff - base_pred
+    stack_base_pred = oof_pred[stack_mask]
+    stack_y_diff = y_diff[stack_mask]
+    resid_train_target = stack_y_diff - stack_base_pred
 
-    X_resid_aug = X_resid.copy()
-    X_resid_aug["base_pred_diff"] = base_pred
-    X_resid_aug["abs_base_pred_diff"] = np.abs(base_pred)
+    X_resid_aug = X_resid.iloc[np.where(stack_mask)[0]].copy()
+    X_resid_aug["base_pred_diff"] = stack_base_pred
+    X_resid_aug["abs_base_pred_diff"] = np.abs(stack_base_pred)
 
     model_diff_resid = CatBoostRegressor(**RESID_MODEL_PARAMS)
     model_diff_resid.fit(
         X_resid_aug,
         resid_train_target,
-        sample_weight=residual_weights(y_diff, base_pred),
+        sample_weight=residual_weights(stack_y_diff, stack_base_pred),
         cat_features=cat_features_resid,
     )
 
     resid_pred = model_diff_resid.predict(X_resid_aug)
-    pred_diff_raw = base_pred + RESIDUAL_SCALE * resid_pred
-    diff_calibrator = fit_linear_calibrator(y_diff, pred_diff_raw)
+    pred_diff_raw = stack_base_pred + RESIDUAL_SCALE * resid_pred
+    diff_calibrator = fit_linear_calibrator(stack_y_diff, pred_diff_raw)
 
     model_total = CatBoostRegressor(**TOTAL_MODEL_PARAMS)
     model_total.fit(
@@ -975,6 +1048,7 @@ def _train_single_sport_models(
         "all_feat_cols": all_feat_cols,
         "diff_calibrator": diff_calibrator,
         "n_rows_fit": int(len(rows)),
+        "n_rows_stack": int(stack_mask.sum()),
     }
 
 

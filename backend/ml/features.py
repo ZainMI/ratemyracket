@@ -80,6 +80,9 @@ CLOSE_MATCH_ABS_THRESHOLD = 3.0
 FAVORITE_EXPECTED_DIFF_THRESHOLD = 5.0
 EWM_ALPHA = 0.25
 LONG_TERM_SHRINK = 10.0
+LONG_TERM_TOTAL_PRIOR = {"TT": 31.7, "BD": 31.5, "SQ": 31.3, "TN": 24.8}
+H2H_SHRINK = 5.0
+H2H_HALF_LIFE_DAYS = 730.0
 
 
 # =================================================
@@ -402,13 +405,21 @@ class PlayerSportLongTermState:
     total_sum: float = 0.0
     wins_sum: float = 0.0
 
-    def features(self, shrink: float = LONG_TERM_SHRINK) -> Dict[str, float]:
+    def features(
+        self,
+        shrink: float = LONG_TERM_SHRINK,
+        total_prior: float = 30.0,
+    ) -> Dict[str, float]:
         denom = self.n_matches + shrink
         return {
             "long_n": float(self.n_matches),
             "long_diff_mean": float(self.diff_sum / denom),
-            "long_total_mean": float(self.total_sum / denom),
-            "long_winrate": float(self.wins_sum / denom),
+            "long_total_mean": float(
+                (self.total_sum + shrink * total_prior) / denom
+            ),
+            "long_winrate": float(
+                (self.wins_sum + 0.5 * shrink) / denom
+            ),
         }
 
     def update(
@@ -451,20 +462,23 @@ def h2h_features(
     out = {}
     out[f"{prefix}h2h_games"] = st.games
 
-    if st.games > 0:
-        winrate_a = st.wins_a / st.games
-        avgdiff_a = st.sum_diff_a / st.games
-    else:
-        winrate_a = 0.5
-        avgdiff_a = 0.0
+    # Shrink small samples toward an even matchup. Older meetings are exposed
+    # with a lower effective sample size so the model can discount stale H2H.
+    winrate_a = (st.wins_a + 0.5 * H2H_SHRINK) / (st.games + H2H_SHRINK)
+    avgdiff_a = st.sum_diff_a / (st.games + H2H_SHRINK)
 
     out[f"{prefix}h2h_winrate_p1"] = winrate_a if a_is_p1 else (1.0 - winrate_a)
     out[f"{prefix}h2h_avg_diff_p1"] = avgdiff_a if a_is_p1 else (-avgdiff_a)
 
     if st.last_dt is None or dt is None or pd.isna(dt):
         out[f"{prefix}h2h_days_since_last"] = np.nan
+        out[f"{prefix}h2h_effective_games"] = 0.0
     else:
-        out[f"{prefix}h2h_days_since_last"] = float((dt - st.last_dt).days)
+        gap = float(max(0, (dt - st.last_dt).days))
+        out[f"{prefix}h2h_days_since_last"] = gap
+        out[f"{prefix}h2h_effective_games"] = float(
+            st.games * math.exp(-math.log(2.0) * gap / H2H_HALF_LIFE_DAYS)
+        )
 
     return out
 
@@ -566,8 +580,9 @@ def build_final_player_state_record(
         rec[f"{s}_games_diff"] = games
         total_pred += rec[f"{s}_pred_diff"]
 
-        rec[f"{s}_days_since_last_p1"] = 0.0
-        rec[f"{s}_time_mult_p1"] = 1.0
+        sport_gap = days_since(elo.last_dt[player_key][s], last_dt)
+        rec[f"{s}_days_since_last_p1"] = sport_gap
+        rec[f"{s}_time_mult_p1"] = time_multiplier(s, sport_gap)
 
         recent_feats = recent_state_features(
             recent_state[player_key][s], last_dt
@@ -576,7 +591,8 @@ def build_final_player_state_record(
             rec[f"{s}_p1_recent_{k}"] = v
 
         long_feats = long_term_state[player_key][s].features(
-            shrink=LONG_TERM_SHRINK
+            shrink=LONG_TERM_SHRINK,
+            total_prior=LONG_TERM_TOTAL_PRIOR[s],
         )
         for k, v in long_feats.items():
             rec[f"{s}_p1_{k}"] = v
@@ -633,6 +649,9 @@ def build_inference_state(
             "a_name": a_name,
             "b_name": b_name,
             "last_dt": st.last_dt,
+            "sport_last_dt": {
+                s: h2h_sport[s][pk].last_dt for s in SPORTS
+            },
         }
 
     return {
@@ -795,12 +814,33 @@ def build_training_data(
             p1_long = long_term_state[p1_key][s]
             p2_long = long_term_state[p2_key][s]
 
-            p1_long_feats = p1_long.features(shrink=LONG_TERM_SHRINK)
-            p2_long_feats = p2_long.features(shrink=LONG_TERM_SHRINK)
+            p1_long_feats = p1_long.features(
+                shrink=LONG_TERM_SHRINK,
+                total_prior=LONG_TERM_TOTAL_PRIOR[s],
+            )
+            p2_long_feats = p2_long.features(
+                shrink=LONG_TERM_SHRINK,
+                total_prior=LONG_TERM_TOTAL_PRIOR[s],
+            )
 
             out.update(add_prefixed(p1_long_feats, f"{s}_p1_"))
             out.update(add_prefixed(p2_long_feats, f"{s}_p2_"))
             add_pairwise_deltas(out, s, p1_long_feats, p2_long_feats)
+
+        # Cross-sport strength lets sparse sport histories borrow signal from a
+        # player's established racketlon ability without contaminating ratings.
+        p1_ratings = [out[f"{s}_rating_p1"] for s in SPORTS]
+        p2_ratings = [out[f"{s}_rating_p2"] for s in SPORTS]
+        out["overall_rating_p1"] = float(np.mean(p1_ratings))
+        out["overall_rating_p2"] = float(np.mean(p2_ratings))
+        out["overall_rating_diff"] = (
+            out["overall_rating_p1"] - out["overall_rating_p2"]
+        )
+        out["rating_balance_p1"] = float(np.std(p1_ratings))
+        out["rating_balance_p2"] = float(np.std(p2_ratings))
+        out["rating_balance_diff"] = (
+            out["rating_balance_p1"] - out["rating_balance_p2"]
+        )
 
         diffs = {s: get_sport_diff(row, s) for s in SPORTS}
         totals = {s: get_sport_total(row, s) for s in SPORTS}
@@ -921,6 +961,12 @@ def build_training_data(
             f"{s}_p1_recent_momentum_diff_5_20",
             f"{s}_p2_recent_momentum_diff_5_20",
             f"{s}_momentum_diff_5_20_diff_p1_p2",
+            f"{s}_p1_recent_recent_n_10",
+            f"{s}_p2_recent_recent_n_10",
+            f"{s}_p1_recent_days_since_last_match",
+            f"{s}_p2_recent_days_since_last_match",
+            f"{s}_p1_recent_ewm_diff",
+            f"{s}_p2_recent_ewm_diff",
             f"{s}_p1_long_n",
             f"{s}_p2_long_n",
             f"{s}_long_n_diff_p1_p2",
@@ -936,6 +982,12 @@ def build_training_data(
         ]
 
     keep_feature_cols += [
+        "overall_rating_p1",
+        "overall_rating_p2",
+        "overall_rating_diff",
+        "rating_balance_p1",
+        "rating_balance_p2",
+        "rating_balance_diff",
         "h2h_games",
         "h2h_avg_diff_p1",
         "h2h_winrate_p1",

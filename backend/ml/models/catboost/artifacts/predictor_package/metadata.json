@@ -1,7 +1,7 @@
 {
   "mode": "train_full",
-  "data_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/data.csv",
-  "inference_state_path": "/Users/zain/Documents/GitHub/RacketRating/backend/ml/data/inference_state.pkl",
+  "data_path": "data/data.csv",
+  "inference_state_path": "data/inference_state.pkl",
   "n_rows": 100838,
   "sport_metrics": {
     "TT": {

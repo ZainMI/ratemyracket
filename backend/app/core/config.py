@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     model_dir: str = "ml/models/catboost/artifacts/predictor_package"
     inference_state_path: str = "ml/data/inference_state.pkl"
 
-    # ✅ R2 CONFIG (new)
+    # R2 configuration
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""
     r2_bucket: str = "data"

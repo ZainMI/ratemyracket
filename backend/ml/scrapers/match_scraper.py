@@ -69,7 +69,7 @@ def fetch(session: requests.Session, url: str, *, timeout: int = 45) -> str:
             if attempt == 4:
                 raise
             print(
-                f"⚠️ fetch failed ({type(e).__name__}) {url} — retrying...",
+                f"Warning: fetch failed ({type(e).__name__}) {url} — retrying...",
                 file=sys.stderr,
             )
             _backoff_sleep(attempt)
@@ -692,13 +692,13 @@ def fetch_matches_for_tournaments(
                 except Exception as e:
                     new_rows = []
                     if verbose:
-                        print(f"  ⚠️ {host} new-mode error: {e}")
+                        print(f"  Warning: {host} new-mode error: {e}")
 
                 if new_rows:
                     rows = new_rows
                     mode_used = f"new via {host}"
                     if verbose:
-                        print(f"  ✅ {mode_used}: {len(rows)} matches")
+                        print(f"  Success: {mode_used}: {len(rows)} matches")
                     break
 
                 # 2) Fall back to LEGACY mode on this host.
@@ -709,18 +709,18 @@ def fetch_matches_for_tournaments(
                 except Exception as e:
                     legacy_rows = []
                     if verbose:
-                        print(f"  ⚠️ {host} legacy-mode error: {e}")
+                        print(f"  Warning: {host} legacy-mode error: {e}")
 
                 if legacy_rows:
                     rows = legacy_rows
                     mode_used = f"legacy via {host}"
                     if verbose:
-                        print(f"  ✅ {mode_used}: {len(rows)} matches")
+                        print(f"  Success: {mode_used}: {len(rows)} matches")
                     break
 
             if not rows:
                 if verbose:
-                    print("  ❌ no matches found on either host (skipping)")
+                    print("  No matches found on either host (skipping)")
                 state.setdefault("done", {})[tid] = True
                 save_state(state, state_json)
                 continue
@@ -730,7 +730,7 @@ def fetch_matches_for_tournaments(
             state.setdefault("done", {})[tid] = True
             save_state(state, state_json)
             if verbose:
-                print(f"  💾 wrote {len(rows)} rows ({mode_used})")
+                print(f"  Wrote {len(rows)} rows ({mode_used})")
 
 
 def parse_args() -> argparse.Namespace:

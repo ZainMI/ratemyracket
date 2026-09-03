@@ -43,28 +43,28 @@ export default function CompactRatings({
       </div>
 
       {/* OVERALL RANKING */}
-      <div className="mb-3 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-4 text-white shadow-sm sm:p-5">
+      <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               Overall rating
             </p>
-            <p className="mt-1 text-4xl font-black tracking-tight">
+            <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
               {overall?.display_rating ?? "—"}
             </p>
-            <p className="mt-1 text-xs font-semibold text-slate-300">
+            <p className="mt-1 text-xs font-semibold text-slate-500">
               Across all four sports · {overall?.games ?? 0} games
             </p>
           </div>
 
           <div className="text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {division} rank
             </p>
-            <p className="mt-1 text-3xl font-black text-emerald-300">
+            <p className="mt-1 text-2xl font-black text-slate-950">
               {overall?.rank ? `#${overall.rank}` : "Unranked"}
             </p>
-            <p className="text-xs font-semibold text-slate-400">
+            <p className="text-xs font-semibold text-slate-500">
               {overall?.ranked_players
                 ? `of ${overall.ranked_players.toLocaleString()}`
                 : "Needs 3 games in a sport"}

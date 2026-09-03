@@ -5,6 +5,7 @@ import { getPlayerRatings, getPlayerMatches } from "@/lib/api";
 import CompactRatings from "@/components/CompactRatings";
 import MatchHistory from "@/components/MatchHistory";
 import MatchHistorySkeleton from "@/components/MatchHistorySkeleton";
+import type { PlayerRatings } from "@/lib/types";
 
 export default function PlayerPage({
   params,
@@ -14,8 +15,8 @@ export default function PlayerPage({
   const { playerKey: rawPlayerKey } = use(params);
   const playerKey = decodeURIComponent(rawPlayerKey);
 
-  const [ratings, setRatings] = useState<any>(null);
-  const [matches, setMatches] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<PlayerRatings | null>(null);
+  const [matches, setMatches] = useState<Array<Record<string, unknown>>>([]);
   const [ratingsLoading, setRatingsLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(true);
 

@@ -4,6 +4,23 @@ export type Player = {
   country?: string;
 };
 
+export type RankedRating = {
+  display_rating: number | null;
+  games: number;
+  rank: number | null;
+  ranked_players: number;
+};
+
+export type SportRating = RankedRating & {
+  raw_rating: number;
+};
+
+export type PlayerRatings = Player & {
+  gender: "male" | "female";
+  overall: RankedRating;
+  ratings: Record<"TT" | "BD" | "SQ" | "TN", SportRating>;
+};
+
 export type SportPrediction = {
   score_p1: number;
   score_p2: number;

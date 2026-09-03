@@ -1,4 +1,5 @@
 import pickle
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 import numpy as np
@@ -161,8 +162,8 @@ def display_rating(
 
     raw = float(raw_rating)
 
-    below = sum(v < raw for v in vals)
-    equal = sum(v == raw for v in vals)
+    below = bisect_left(vals, raw)
+    equal = bisect_right(vals, raw) - below
 
     percentile = (below + 0.5 * equal) / len(vals)
 
@@ -249,11 +250,44 @@ def get_player_ratings(player_key: str):
             "games": games,
         }
 
+    overall_rows = get_leaderboard(
+        sport="overall",
+        gender=info["gender"],
+        limit=len(players),
+    )
+    overall_entry = next(
+        (row for row in overall_rows if row["player_key"] == player_key),
+        None,
+    )
+
+    for sport in SPORTS:
+        sport_rows = get_leaderboard(
+            sport=sport,
+            gender=info["gender"],
+            limit=len(players),
+        )
+        sport_entry = next(
+            (row for row in sport_rows if row["player_key"] == player_key),
+            None,
+        )
+        ratings[sport]["rank"] = (
+            sport_entry["rank"] if sport_entry is not None else None
+        )
+        ratings[sport]["ranked_players"] = len(sport_rows)
+
     return {
         "player_key": player_key,
         "player_name": info["player_name"],
         "country": info["country"],
         "gender": info["gender"],
+        "overall": {
+            "display_rating": (
+                overall_entry["rating"] if overall_entry is not None else None
+            ),
+            "games": overall_entry["games"] if overall_entry is not None else 0,
+            "rank": overall_entry["rank"] if overall_entry is not None else None,
+            "ranked_players": len(overall_rows),
+        },
         "ratings": ratings,
     }
 

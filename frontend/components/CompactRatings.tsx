@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { SPORT_META, SPORTS } from "@/lib/sportColors";
+import type { PlayerRatings } from "@/lib/types";
 import FavoriteButton from "@/components/FavoriteButton";
 
 export default function CompactRatings({
@@ -6,7 +8,7 @@ export default function CompactRatings({
   ratings,
 }: {
   title: string;
-  ratings: any;
+  ratings: PlayerRatings;
 }) {
   if (!ratings) return null;
 
@@ -15,6 +17,8 @@ export default function CompactRatings({
     player_name: ratings.player_name,
     country: ratings.country || "",
   };
+  const overall = ratings.overall;
+  const division = ratings.gender === "female" ? "Women" : "Men";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -38,7 +42,38 @@ export default function CompactRatings({
         <FavoriteButton player={favoritePlayer} />
       </div>
 
-      {/* RATINGS GRID */}
+      {/* OVERALL RANKING */}
+      <div className="mb-3 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-4 text-white shadow-sm sm:p-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
+              Overall rating
+            </p>
+            <p className="mt-1 text-4xl font-black tracking-tight">
+              {overall?.display_rating ?? "—"}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-300">
+              Across all four sports · {overall?.games ?? 0} games
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              {division} rank
+            </p>
+            <p className="mt-1 text-3xl font-black text-emerald-300">
+              {overall?.rank ? `#${overall.rank}` : "Unranked"}
+            </p>
+            <p className="text-xs font-semibold text-slate-400">
+              {overall?.ranked_players
+                ? `of ${overall.ranked_players.toLocaleString()}`
+                : "Needs 3 games in a sport"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* SPORT RATINGS GRID */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {SPORTS.map((sport) => {
           const meta = SPORT_META[sport];
@@ -46,19 +81,39 @@ export default function CompactRatings({
 
           return (
             <div key={sport} className={`rounded-xl border p-3 ${meta.badge}`}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-black">{sport}</p>
-                <p className="text-xs opacity-70">{r?.games ?? 0} games</p>
+                <p className="text-xs font-black">
+                  {r?.rank ? `#${r.rank}` : "Unranked"}
+                </p>
               </div>
 
               <p className="mt-1 text-2xl font-black">
                 {r?.display_rating ?? "—"}
               </p>
 
-              <p className="truncate text-xs opacity-70">{meta.name}</p>
+              <div className="mt-0.5 flex items-center justify-between gap-2 text-xs opacity-70">
+                <p className="truncate">{meta.name}</p>
+                <p className="shrink-0">{r?.games ?? 0} games</p>
+              </div>
+
+              <p className="mt-2 border-t border-current/10 pt-2 text-[11px] font-semibold opacity-70">
+                {r?.rank
+                  ? `Ranked ${r.rank} of ${r.ranked_players.toLocaleString()}`
+                  : "3 games required to rank"}
+              </p>
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-3 text-right">
+        <Link
+          href="/leaderboards"
+          className="text-xs font-black text-emerald-700 transition hover:text-emerald-600 hover:underline"
+        >
+          View full leaderboards →
+        </Link>
       </div>
     </div>
   );

@@ -44,7 +44,7 @@ export default function CompactRatings({
 
       {/* OVERALL RANKING */}
       <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               Overall rating
@@ -58,15 +58,12 @@ export default function CompactRatings({
           </div>
 
           <div className="text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              {division} rank
-            </p>
-            <p className="mt-1 text-2xl font-black text-slate-950">
-              {overall?.rank ? `#${overall.rank}` : "Unranked"}
+            <p className="text-lg font-black text-slate-950">
+              {overall?.rank ? `Rank ${overall.rank}` : "Unranked"}
             </p>
             <p className="text-xs font-semibold text-slate-500">
               {overall?.ranked_players
-                ? `of ${overall.ranked_players.toLocaleString()}`
+                ? `${division} · ${overall.ranked_players.toLocaleString()} players`
                 : "Needs 3 games in a sport"}
             </p>
           </div>
@@ -84,7 +81,7 @@ export default function CompactRatings({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-black">{sport}</p>
                 <p className="text-xs font-black">
-                  {r?.rank ? `#${r.rank}` : "Unranked"}
+                  {r?.rank ? `Rank ${r.rank}` : "Unranked"}
                 </p>
               </div>
 
@@ -97,11 +94,6 @@ export default function CompactRatings({
                 <p className="shrink-0">{r?.games ?? 0} games</p>
               </div>
 
-              <p className="mt-2 border-t border-current/10 pt-2 text-[11px] font-semibold opacity-70">
-                {r?.rank
-                  ? `Ranked ${r.rank} of ${r.ranked_players.toLocaleString()}`
-                  : "3 games required to rank"}
-              </p>
             </div>
           );
         })}

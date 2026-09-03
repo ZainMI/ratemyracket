@@ -569,11 +569,12 @@ def get_leaderboard(
 
         else:
             sport_ratings = []
-            total_games = 0
+            games_by_sport = []
 
             for s in SPORTS:
                 games_s = int(float(record.get(f"{s}_games_p1", 0)))
                 raw_s = float(record.get(f"{s}_rating_p1", 0.0))
+                games_by_sport.append(games_s)
 
                 if games_s >= MIN_GAMES_FOR_RATING_SCALE:
                     sport_ratings.append(
@@ -584,13 +585,15 @@ def get_leaderboard(
                             gender=player_gender,
                         )
                     )
-                    total_games += games_s
 
             if not sport_ratings:
                 continue
 
             rating = int(round(sum(sport_ratings) / len(sport_ratings)))
-            games = total_games
+            # Every complete match has TT/BD/SQ, while tennis may stop early.
+            # The largest per-sport count is therefore the number of match rows,
+            # unlike summing the counts, which counts one match up to four times.
+            games = max(games_by_sport, default=0)
 
         rows.append(
             {

@@ -5,7 +5,6 @@ services:
       dockerfile: docker/Dockerfile.api
 
     container_name: ratemyracket-api
-
     restart: unless-stopped
 
     env_file:
@@ -29,6 +28,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+
+    container_name: ratemyracket-cloudflared
+    restart: unless-stopped
+
+    command: tunnel --no-autoupdate run
+
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+
+    networks:
+      - ratemyracket
+
+    depends_on:
+      api:
+        condition: service_healthy
 
 networks:
   ratemyracket:

@@ -1,3 +1,4 @@
 .env.worker
 logs/
 .env.api
+.env

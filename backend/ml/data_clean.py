@@ -8,6 +8,9 @@ INVALID_DRAWS = ["double", "doubles", "mixed", "league", "team"]
 DEFAULT_PLAYER_CORRECTIONS = (
     Path(__file__).resolve().parent / "data" / "player_corrections.csv"
 )
+DEFAULT_MATCH_EXCLUSIONS = (
+    Path(__file__).resolve().parent / "data" / "match_exclusions.csv"
+)
 PLAYER_CORRECTION_FIELDS = [
     "source_name",
     "source_country",
@@ -26,6 +29,16 @@ UNKNOWN_COUNTRIES = {
     "-",
     "?",
 }
+
+MATCH_EXCLUSION_FIELDS = [
+    "mode",
+    "tournament_id",
+    "match_date",
+    "team1_players",
+    "team2_players",
+    "status_message",
+    "reason",
+]
 
 
 def normalize_name(value):
@@ -144,6 +157,39 @@ def build_player_country_lookup(input_csv, corrections):
     }
 
 
+def load_match_exclusions(path=DEFAULT_MATCH_EXCLUSIONS):
+    """Load exact, auditable match removals from a tracked CSV file."""
+    path = Path(path)
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+
+    with path.open(newline="", encoding="utf-8") as infile:
+        reader = csv.DictReader(infile)
+        missing = set(MATCH_EXCLUSION_FIELDS) - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(
+                f"{path} is missing exclusion columns: "
+                + ", ".join(sorted(missing))
+            )
+        return [row for row in reader if any(row.values())]
+
+
+def is_excluded_match(row, exclusions):
+    """Return True when a row matches every populated identity field."""
+    for exclusion in exclusions:
+        matches = True
+        for field in MATCH_EXCLUSION_FIELDS:
+            if field == "reason":
+                continue
+            expected = _dedupe_text(exclusion.get(field))
+            if expected and _dedupe_text(row.get(field)) != expected:
+                matches = False
+                break
+        if matches:
+            return True
+    return False
+
+
 def infer_match_gender_from_draw(draw_name):
     draw = (draw_name or "").lower()
 
@@ -218,8 +264,10 @@ def clean_matches(
     input_csv="data/matches.csv",
     output_csv="data/matches_cleaned.csv",
     corrections_csv=DEFAULT_PLAYER_CORRECTIONS,
+    exclusions_csv=DEFAULT_MATCH_EXCLUSIONS,
 ):
     corrections = load_player_corrections(corrections_csv)
+    exclusions = load_match_exclusions(exclusions_csv)
     country_lookup = build_player_country_lookup(input_csv, corrections)
     inferred_countries = 0
 
@@ -240,6 +288,7 @@ def clean_matches(
             kept = 0
             removed = 0
             cross_source_removed = 0
+            explicitly_excluded = 0
 
             # Prefer richer TournamentSoftware/manual rows over Jacketlon when
             # the same match exists in both sources.
@@ -300,6 +349,11 @@ def clean_matches(
                     row[player_field] = player
                     row[country_field] = country
 
+                if is_excluded_match(row, exclusions):
+                    removed += 1
+                    explicitly_excluded += 1
+                    continue
+
                 is_jacketlon = (
                     str(row.get("mode") or "").lower() == "jacketlon"
                 )
@@ -352,12 +406,14 @@ def clean_matches(
 
     print(f"Saved cleaned file to {output_csv}")
     print(f"Applied {len(corrections)} player correction rules.")
+    print(f"Applied {len(exclusions)} explicit match exclusion rules.")
     print(
         f"Filled {inferred_countries} missing countries from "
         "unambiguous player-name matches."
     )
     print(f"Kept: {kept} rows | Removed: {removed} rows")
     print(f"Removed {cross_source_removed} cross-source duplicate rows.")
+    print(f"Removed {explicitly_excluded} explicitly excluded matches.")
 
 
 if __name__ == "__main__":

@@ -119,6 +119,71 @@ class JacketlonScraperTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["mode"], "new")
 
+    def test_known_walkover_is_removed_by_cleaner(self):
+        row = dict.fromkeys(FIELDNAMES, "")
+        row.update(
+            {
+                "mode": "jacketlon",
+                "tournament_id": "JACKETLON:2",
+                "match_date": "20260530",
+                "draw": "Men SHA",
+                "team1_players": "Jonathan GILL",
+                "team2_players": "Paul MUNIERE",
+                "team1_nationalities": "usa",
+                "team2_nationalities": "fra",
+                "status_message": "Jacketlon match 199",
+                "TT_p1": 16,
+                "TT_p2": 21,
+                "BD_p1": 7,
+                "BD_p2": 21,
+                "SQ_p1": 1,
+                "SQ_p2": 21,
+                "raw_points": "16-21|7-21|1-21|-",
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = Path(tmp) / "raw.csv"
+            cleaned = Path(tmp) / "cleaned.csv"
+            corrections = Path(tmp) / "missing-corrections.csv"
+            exclusions = Path(tmp) / "exclusions.csv"
+            with raw.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
+                writer.writeheader()
+                writer.writerow(row)
+            with exclusions.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=[
+                        "mode",
+                        "tournament_id",
+                        "match_date",
+                        "team1_players",
+                        "team2_players",
+                        "status_message",
+                        "reason",
+                    ],
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "mode": "jacketlon",
+                        "tournament_id": "JACKETLON:2",
+                        "match_date": "20260530",
+                        "team1_players": "Jonathan Gill",
+                        "team2_players": "Paul Muniere",
+                        "status_message": "Jacketlon match 199",
+                        "reason": "walkover",
+                    }
+                )
+
+            clean_matches(raw, cleaned, corrections, exclusions)
+
+            with cleaned.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertEqual(rows, [])
+
 
 if __name__ == "__main__":
     unittest.main()

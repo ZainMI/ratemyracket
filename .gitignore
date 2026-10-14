@@ -26,6 +26,7 @@ backend/ml/data/*
 !backend/ml/data/player_corrections.csv
 !backend/ml/data/added_data.csv
 !backend/ml/data/deleted_matches.csv
+!backend/ml/data/match_exclusions.csv
 backend/ml/models/catboost/artifacts/
 catboost_info/
 

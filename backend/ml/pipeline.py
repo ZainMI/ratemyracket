@@ -23,6 +23,11 @@ from scrapers.tournament_id_scraper import (
     fetch_tournament_ids,
 )
 from scrapers.match_scraper import fetch_matches_for_tournaments
+from scrapers.jacketlon_scraper import (
+    fetch_jacketlon_matches,
+    fetch_jacketlon_tournaments,
+    prefixed_tournament_id,
+)
 from data_clean import clean_matches
 from features import build_training_data
 from models.catboost.catboost_fin import train_full_and_package
@@ -122,6 +127,7 @@ def run_pipeline(
 
     raw_matches_csv = data_dir / "matches_raw.csv"
     scraped_matches_csv = data_dir / "matches_recent.csv"
+    jacketlon_matches_csv = data_dir / "matches_jacketlon_recent.csv"
     added_data_csv = data_dir / "added_data.csv"
 
     cleaned_matches_csv = data_dir / "matches_cleaned.csv"
@@ -132,6 +138,8 @@ def run_pipeline(
     run_label = "full" if full_backfill else "recent"
     tournament_ids_csv = data_dir / f"tournament_ids_{run_label}.csv"
     state_file = data_dir / f"scraper_state_{run_label}.json"
+    jacketlon_state_file = data_dir / f"jacketlon_state_{run_label}.json"
+    jacketlon_ids_csv = data_dir / f"jacketlon_tournament_ids_{run_label}.csv"
 
     predictor_dir = (
         BASE_DIR / "models" / "catboost" / "artifacts" / "predictor_package"
@@ -195,7 +203,25 @@ def run_pipeline(
             source_errors[source["name"]] = str(exc)
             print(f"  Warning: {source['name']} discovery failed: {exc}")
 
-    if len(source_errors) == len(tournament_sources):
+    tournament_ids = sorted(set(tournament_ids))
+
+    jacketlon_tournaments: list[dict] = []
+    try:
+        # Jacketlon has a small historical catalog. Always discover it so a
+        # server's first ordinary daily run bootstraps the French archive;
+        # its state file makes subsequent runs skip completed old events.
+        jacketlon_tournaments = fetch_jacketlon_tournaments(
+            start_date="2000-01-01",
+            end_date=end_date,
+            mapping_csv=str(tournament_mapping_csv),
+        )
+        ids_by_source["Jacketlon"] = len(jacketlon_tournaments)
+        print(f"  Jacketlon: {len(jacketlon_tournaments)} tournaments")
+    except Exception as exc:
+        source_errors["Jacketlon"] = str(exc)
+        print(f"  Warning: Jacketlon discovery failed: {exc}")
+
+    if len(source_errors) == len(tournament_sources) + 1:
         raise RuntimeError(
             "Tournament discovery failed for every configured source: "
             + "; ".join(
@@ -203,13 +229,30 @@ def run_pipeline(
             )
         )
 
-    tournament_ids = sorted(set(tournament_ids))
-
-    print(f"Found {len(tournament_ids)} tournaments.")
+    print(
+        "Found "
+        f"{len(tournament_ids) + len(jacketlon_tournaments)} tournaments "
+        "across all sources."
+    )
     print(f"Tournament mapping updated at: {tournament_mapping_csv}")
 
     pd.DataFrame({"tournament_id": tournament_ids}).to_csv(
         tournament_ids_csv,
+        index=False,
+    )
+    jacketlon_ids = [
+        prefixed_tournament_id(tournament["id"])
+        for tournament in jacketlon_tournaments
+    ]
+    jacketlon_recent_ids = [
+        prefixed_tournament_id(tournament["id"])
+        for tournament in jacketlon_tournaments
+        if start_date
+        <= str(tournament.get("start_date") or "")
+        <= end_date
+    ]
+    pd.DataFrame({"tournament_id": jacketlon_ids}).to_csv(
+        jacketlon_ids_csv,
         index=False,
     )
 
@@ -221,9 +264,14 @@ def run_pipeline(
     print("\n[2/6] Scraping tournament matches...")
 
     remove_file_if_exists(scraped_matches_csv)
+    remove_file_if_exists(jacketlon_matches_csv)
 
     if not full_backfill:
         reset_state_for_tournaments(state_file, tournament_ids)
+        reset_state_for_tournaments(
+            jacketlon_state_file,
+            jacketlon_recent_ids,
+        )
 
     if tournament_ids:
         fetch_matches_for_tournaments(
@@ -236,11 +284,36 @@ def run_pipeline(
     else:
         print("Skipping match scrape because no tournament IDs were found.")
 
+    jacketlon_result = {
+        "processed_tournaments": 0,
+        "matches_written": 0,
+        "errors": [],
+    }
+    if jacketlon_tournaments:
+        try:
+            jacketlon_result = fetch_jacketlon_matches(
+                tournaments=jacketlon_tournaments,
+                out_csv=str(jacketlon_matches_csv),
+                state_json=str(jacketlon_state_file),
+                fresh=full_backfill,
+                verbose=True,
+            )
+        except Exception as exc:
+            source_errors["Jacketlon matches"] = str(exc)
+            print(f"  Warning: Jacketlon match scrape failed: {exc}")
+    else:
+        print("Skipping Jacketlon match scrape: no tournaments found.")
+
     print("\n[3/6] Merging scraped + manually added matches...")
 
     merge_match_csvs(
         full_path=raw_matches_csv,
         source_path=scraped_matches_csv,
+    )
+
+    merge_match_csvs(
+        full_path=raw_matches_csv,
+        source_path=jacketlon_matches_csv,
     )
 
     merge_match_csvs(
@@ -322,13 +395,16 @@ def run_pipeline(
         "mode": "full_backfill" if full_backfill else "recent_update",
         "start_date": start_date,
         "end_date": end_date,
-        "tournaments_found": len(tournament_ids),
+        "tournaments_found": len(tournament_ids) + len(jacketlon_tournaments),
         "tournaments_by_source": ids_by_source,
         "tournament_source_errors": source_errors,
         "tournament_ids_csv": str(tournament_ids_csv),
+        "jacketlon_tournament_ids_csv": str(jacketlon_ids_csv),
         "tournament_mapping_csv": str(tournament_mapping_csv),
         "raw_matches_csv": str(raw_matches_csv),
         "scraped_matches_csv": str(scraped_matches_csv),
+        "jacketlon_matches_csv": str(jacketlon_matches_csv),
+        "jacketlon_result": jacketlon_result,
         "added_data_csv": str(added_data_csv),
         "cleaned_matches_csv": str(cleaned_matches_csv),
         "feature_csv": str(feature_csv),

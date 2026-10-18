@@ -20,6 +20,15 @@ htmlcov/
 # Local runtime output
 *.log
 .DS_Store
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite*-journal
+*.sqlite*-wal
+*.sqlite*-shm
 
 # Pipeline output (R2 is the canonical store)
 backend/ml/data/*

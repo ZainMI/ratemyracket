@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     frontend_urls: str = ""
 
-    database_url: str = "sqlite:///./racket_rating.db"
-
     auth_secret_key: str = "change-me"
     auth_algorithm: str = "HS256"
 
